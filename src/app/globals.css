@@ -37,3 +37,182 @@ body {
   font-family: var(--font-display), ui-serif, Georgia, serif;
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------------ monument */
+.monument {
+  --p: 0;
+  --sy: 0px;
+  position: relative;
+  overflow-x: clip;
+  color: #2f281e;
+  font-family: var(--font-garamond), Georgia, serif;
+}
+.mon-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: #b9cde0;
+}
+.mon-layer {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  transform: translateY(calc((0.5 - var(--p)) * 3%));
+  will-change: opacity, transform;
+}
+.mon-warm {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 12% 0%, rgba(255, 214, 150, 0.85), rgba(255, 214, 150, 0) 60%),
+    linear-gradient(180deg, rgba(255, 236, 205, 0.35), rgba(255, 236, 205, 0) 70%);
+  mix-blend-mode: soft-light;
+  opacity: var(--warm);
+}
+.mon-rays {
+  position: absolute;
+  left: -30vmax;
+  top: -40vmax;
+  width: 120vmax;
+  height: 120vmax;
+  background: repeating-conic-gradient(from 100deg at 50% 50%,
+      rgba(255, 238, 200, 0.55) 0deg 2.2deg, rgba(255, 238, 200, 0) 2.2deg 7deg,
+      rgba(255, 238, 200, 0.3) 7deg 8.5deg, rgba(255, 238, 200, 0) 8.5deg 15deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 75%);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 75%);
+  filter: blur(14px);
+  mix-blend-mode: screen;
+  opacity: var(--rays);
+  animation: mon-rays 90s linear infinite;
+}
+@keyframes mon-rays { to { transform: rotate(14deg); } }
+
+.mon-clouds { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.mon-cloud {
+  position: absolute;
+  max-width: none;
+  transform: translateY(calc(var(--sy) * var(--depth) * -1)) translateX(calc(var(--sy) * var(--depth) * 0.04));
+  will-change: transform;
+}
+
+.mon-birds { position: absolute; inset: 0; opacity: var(--birds); pointer-events: none; }
+.mon-flock { position: absolute; width: 90px; height: 38px; fill: none; stroke: rgba(48, 42, 36, 0.75); stroke-width: 1.4; stroke-linecap: round; }
+.mon-flock-0 { top: 22%; animation: mon-fly 38s linear infinite; }
+.mon-flock-1 { top: 38%; width: 60px; animation: mon-fly 52s linear infinite 14s; }
+.mon-flock-2 { top: 14%; width: 46px; animation: mon-fly 64s linear infinite 30s; opacity: 0.7; }
+@keyframes mon-fly {
+  0% { transform: translateX(-12vw) translateY(0); }
+  50% { transform: translateX(50vw) translateY(-3vh); }
+  100% { transform: translateX(112vw) translateY(1vh); }
+}
+.mon-bird { animation: mon-flap 0.9s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes mon-flap { from { d: path("M-6 0 Q-3 -3 0 0 Q3 -3 6 0"); } to { d: path("M-6 -1 Q-3 1 0 0 Q3 1 6 -1"); } }
+
+.mon-piece { position: relative; z-index: 1; display: block; max-width: none; pointer-events: none; user-select: none; }
+.mon-row { --focus: 1; }
+.mon-cover {
+  z-index: 0;
+  overflow: hidden;
+  background: #d8d0c0;
+  cursor: pointer;
+  filter: blur(calc((1 - var(--focus)) * 1.6px)) saturate(calc(0.75 + 0.25 * var(--focus)));
+}
+.mon-cover img { width: 100%; height: 100%; object-fit: cover; }
+.mon-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 2px 10px rgba(30, 20, 5, 0.45);
+  background: linear-gradient(120deg, rgba(255, 240, 210, 0.18), transparent 40%);
+}
+
+/* letters cut into the marble: dark in the groove, a lit lower lip, a shadowed upper edge */
+.mon-carved {
+  z-index: 2;
+  color: rgba(78, 68, 54, 0.9);
+  text-shadow: 0 1px 0 rgba(255, 252, 244, 0.75), 0 -1px 0 rgba(50, 38, 22, 0.28);
+  mix-blend-mode: multiply;
+  opacity: calc(0.55 + 0.45 * var(--focus, 1));
+  transition: opacity 0.2s;
+}
+.mon-roman {
+  font-family: var(--font-roman), serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.mon-tablet {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0 0.4em;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.mon-band { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; overflow: hidden; }
+.mon-numeral { font-family: var(--font-roman), serif; font-weight: 700; letter-spacing: 0.04em; line-height: 1; flex-shrink: 0; }
+.mon-lines { display: flex; min-width: 0; flex-direction: column; line-height: 1.12; }
+.mon-title { font-family: var(--font-garamond), serif; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mon-artist { font-family: var(--font-roman), serif; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+.mon-kicker { font-family: var(--font-roman), serif; letter-spacing: 0.4em; font-size: 12px; color: #6e5f45; text-transform: uppercase; }
+.mon-name { font-family: var(--font-roman), serif; font-weight: 700; font-size: clamp(40px, 7vw, 84px); letter-spacing: 0.08em; color: #3a3125; line-height: 1.05; text-shadow: 0 1px 0 rgba(255, 250, 238, 0.7); }
+.mon-sub { margin-top: 6px; font-style: italic; font-size: 18px; color: #4d4334; }
+.mon-btn {
+  display: inline-block;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 96, 52, 0.45);
+  background: rgba(250, 246, 236, 0.82);
+  padding: 8px 18px;
+  font-family: var(--font-roman), serif;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #4a3d28;
+  backdrop-filter: blur(6px);
+}
+.mon-plaque-wrap { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(40, 32, 20, 0.35); backdrop-filter: blur(6px); }
+.mon-plaque {
+  width: min(560px, 100%);
+  border-radius: 6px;
+  padding: 26px;
+  background: linear-gradient(160deg, #fbf8f1, #efe8da);
+  box-shadow: 0 30px 80px rgba(40, 30, 10, 0.35), inset 0 0 0 1px rgba(170, 140, 80, 0.35);
+}
+.monument-still .mon-rays, .monument-still .mon-flock, .monument-still .mon-bird { animation: none; }
+.monument-still .mon-cloud { transform: none; }
+
+/* the site header floats over the sky on the monument page */
+body:has(.monument) [data-site-header] {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 40;
+  border: 0;
+  background: linear-gradient(rgba(250, 246, 236, 0.55), rgba(250, 246, 236, 0));
+}
+body:has(.monument) [data-site-header] a { color: #3a3125; }
+body:has(.monument) main { max-width: none; padding: 0; }
+.mon-ground {
+  position: relative;
+  z-index: 5;
+  background: url(/monument/ground.webp) center top / cover no-repeat;
+  min-height: 34vh;
+}
+.mon-ground::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--colx) - var(--colw) / 2);
+  width: var(--colw);
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(30, 24, 12, 0.45), rgba(30, 24, 12, 0));
+  transform: translateY(-6px);
+}

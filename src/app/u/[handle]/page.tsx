@@ -8,6 +8,19 @@ import { Art, RankedRow } from "@/components/track";
 import { hasStory } from "@/lib/story-values";
 import { backfillTracks } from "@/lib/spotify";
 import { after } from "next/server";
+import { artistLine } from "@/lib/songs";
+import { FOUND_VIA_OPTIONS } from "@/lib/stories";
+import type { Entry } from "@/lib/lists";
+import { Monument, type MonumentSong } from "./Monument";
+
+function foundText(o: Entry["origin"]) {
+  if (!o) return null;
+  const via = o.foundVia ?? (o.fromUserId ? "friend" : o.fromName ? "someone" : null);
+  if (via === "friend" && o.fromUser) return `Put on by ${o.fromUser.name}`;
+  if (via === "someone" && o.fromName) return `Put on by ${o.fromName}`;
+  const tag = FOUND_VIA_OPTIONS.find((x) => x.value === via)?.tag;
+  return tag ? tag.charAt(0).toUpperCase() + tag.slice(1) : null;
+}
 
 export default async function ProfilePage({ params, searchParams }: PageProps<"/u/[handle]">) {
   const viewer = await requireUser();
@@ -20,11 +33,48 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
   const isMe = person.id === viewer.id;
 
   const [allTime, onDeck] = await Promise.all([getList(person.id, "all_time"), getList(person.id, "on_deck")]);
+  after(() => backfillTracks());
+
+  // The monument is the default way to see an all-time list; ?view=list is the plain list.
+  if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
+    const songs: MonumentSong[] = allTime.map((e) => ({
+      id: e.track.id,
+      rank: e.position,
+      name: e.track.name,
+      artists: artistLine(e.track.artists) || "Unknown artist",
+      album: e.track.album,
+      year: e.track.releaseYear,
+      imageUrl: e.track.imageUrl,
+      love: e.origin?.love ?? null,
+      moment: e.origin?.moment ?? null,
+      found: foundText(e.origin),
+      memory: [e.origin?.story, e.origin?.whenText].filter(Boolean).join(" · ") || null,
+    }));
+    const btn = "mon-btn";
+    return (
+      <Monument
+        person={{ name: person.name, handle: person.handle }}
+        songs={songs}
+        isMe={isMe}
+        storyHref={`/me/stories?list=all_time`}
+        toolbar={
+          <>
+            <Link href={`/u/${handle}?view=list`} className={btn}>List view</Link>
+            {onDeck.length > 0 && <Link href={`/u/${handle}?list=on_deck`} className={btn}>On Deck ({onDeck.length})</Link>}
+            {isMe ? (
+              <Link href="/me/edit" className={btn}>Reorder</Link>
+            ) : (
+              <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className={btn}>Compare with me</Link>
+            )}
+          </>
+        }
+      />
+    );
+  }
   const entries = kind === "on_deck" ? onDeck : allTime;
   const putOns = allTime.filter((e) => e.origin?.fromUser).length;
   const withStory = allTime.filter((e) => hasStory(e.origin)).length;
   const untold = entries.filter((e) => !hasStory(e.origin)).length;
-  after(() => backfillTracks());
 
   return (
     <div>
@@ -55,6 +105,11 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
               Compare with me
             </Link>
           )}
+          {allTime.length > 0 && (
+            <Link href={`/u/${handle}`} className="rounded-full border border-line px-4 py-2 text-sm">
+              Monument view
+            </Link>
+          )}
         </div>
       </section>
 
@@ -74,7 +129,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       )}
 
       <div className="mt-10 flex gap-6 border-b border-line text-sm">
-        <Tab href={`/u/${handle}`} active={kind === "all_time"} label={`All-Time (${allTime.length})`} />
+        <Tab href={`/u/${handle}?view=list`} active={kind === "all_time"} label={`All-Time (${allTime.length})`} />
         <Tab href={`/u/${handle}?list=on_deck`} active={kind === "on_deck"} label={`On Deck (${onDeck.length})`} />
       </div>
 

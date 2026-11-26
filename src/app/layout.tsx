@@ -6,6 +6,21 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
+const roman = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-500-normal.woff2", weight: "500" },
+    { path: "../../node_modules/@fontsource/cinzel/files/cinzel-latin-700-normal.woff2", weight: "700" },
+  ],
+  variable: "--font-roman",
+});
+const garamond = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-500-italic.woff2", weight: "500", style: "italic" },
+  ],
+  variable: "--font-garamond",
+});
 const display = localFont({
   src: "../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2",
   variable: "--font-display",
@@ -22,9 +37,9 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} h-full antialiased`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
-        <header className="border-b border-line">
+        <header data-site-header className="border-b border-line">
           <nav className="mx-auto flex max-w-5xl items-center gap-5 px-5 py-4 text-sm">
             <Link href="/" className="rank-num text-2xl tracking-tight">
               All-Timers
