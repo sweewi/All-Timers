@@ -7,6 +7,7 @@ import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
 import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails } from "./actions";
 import { ActionButton } from "./ActionButton";
+import { Altitude } from "@/components/World";
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const user = await requireUser();
@@ -21,6 +22,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
   return (
     <div className="mx-auto max-w-2xl space-y-10">
+      <Altitude base={0.22} range={0.1} />
       <h1 className="rank-num text-5xl">Settings</h1>
 
       <section className="space-y-3">

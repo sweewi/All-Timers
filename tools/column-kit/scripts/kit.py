@@ -160,7 +160,7 @@ def lawn_material():
 SCALE = float(os.environ.get("CLUMPSCALE", "0.85"))
 
 
-def grass_clumps(z, count, seed=4):
+def grass_clumps(z, count, seed=4, maxr=2.4):
     """Scatter Poly Haven grass clumps (CC0) around the plinth, thicker close to the stone."""
     protos = []
     tinted = set()
@@ -198,7 +198,7 @@ def grass_clumps(z, count, seed=4):
         x, y = r * math.cos(a), r * math.sin(a) * 0.9
         if abs(x) < 0.74 and abs(y) < 0.74:
             continue
-        if r > 2.4:
+        if r > maxr:
             continue
         p = rnd.choice(protos)
         o = bpy.data.objects.new("clump", p.data)
@@ -222,17 +222,27 @@ def base_piece(variant="full", tilt=7.0):
         P.ivy(31, 7, top - SH, period=SH)
     P.ivy(32, 5, -0.45, tip_zone=(0.5, 1.3))
     zg = -0.445
+    import world as Wd
+    # terracotta sand that melts into the world plate, and a perfect circle of lawn
     bpy.ops.mesh.primitive_plane_add(size=14, location=(0, 0, zg))
-    lawn = bpy.context.active_object
-    lawn.data.materials.append(lawn_material())
-    grass_clumps(zg, int(os.environ.get("CLUMPS", "1100")))
+    bpy.context.active_object.data.materials.append(Wd.sand_material(fade=(1.9, 3.1)))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=160, radius=1.4, depth=0.012, location=(0, 0, zg + 0.006))
+    bpy.context.active_object.data.materials.append(lawn_material())
+    grass_clumps(zg + 0.012, int(os.environ.get("CLUMPS", "900")), maxr=1.38)
+    # anything that pokes below the ground (ivy roots) must not show through the faded sand
+    bpy.ops.mesh.primitive_plane_add(size=30, location=(0, 0, zg - 0.004))
+    under = bpy.context.active_object
+    hm = bpy.data.materials.new("under"); hm.use_nodes = True
+    hn = hm.node_tree; hn.nodes.clear()
+    hn.links.new(hn.nodes.new("ShaderNodeHoldout").outputs[0], hn.nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
+    under.data.materials.append(hm)
     # camera looks down a few degrees so the lawn reads as ground, not a line
     t = math.radians(tilt)
     up = Vector((0, math.sin(t), math.cos(t)))
     fwd = Vector((0, math.cos(t), -math.sin(t)))
     v = lambda x, y, z: Vector((x, y, z)).dot(up)
     v_top = v(0, -C.R, top + OV)                # top of the image: front of the shaft
-    v_bot = v(0, -0.71 - 2.6, zg)               # bottom: lawn well in front of the plinth
+    v_bot = v(0, -0.71 - 2.9, zg)               # bottom: lawn well in front of the plinth
     h = v_top - v_bot
     vc = (v_top + v_bot) / 2
     cam = bpy.data.cameras.new("Cam"); cam.type = "ORTHO"; cam.ortho_scale = max(W, h)

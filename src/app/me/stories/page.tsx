@@ -5,6 +5,7 @@ import { getCrewMembers, getList } from "@/lib/lists";
 import { artistLine } from "@/lib/songs";
 import { hasStory, toStoryValues } from "@/lib/story-values";
 import { StoryMode, type StoryItem } from "./StoryMode";
+import { Altitude } from "@/components/World";
 
 /** Go through your list one song at a time and say why each one is here. */
 export default async function StoriesPage({ searchParams }: PageProps<"/me/stories">) {
@@ -31,6 +32,8 @@ export default async function StoriesPage({ searchParams }: PageProps<"/me/stori
   const startAt = typeof sp.track === "string" ? sp.track : null;
 
   return (
+    <>
+    <Altitude base={0.7} range={0.1} />
     <StoryMode
       kind={kind}
       handle={user.handle}
@@ -39,5 +42,6 @@ export default async function StoriesPage({ searchParams }: PageProps<"/me/stori
       members={members.filter((m) => m.id !== user.id).map((m) => ({ id: m.id, name: m.name, color: m.color }))}
       inviteCode={crew[0].inviteCode}
     />
+    </>
   );
 }

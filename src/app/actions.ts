@@ -1,10 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { eq, like } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
+import { refresh } from "next/cache";
 import { getDb, schema } from "@/db";
-import { startSession, endSession } from "@/lib/auth";
+import { startSession, endSession, requireUser } from "@/lib/auth";
+import { getList, saveList } from "@/lib/lists";
 import { newId, newToken, pickColor, slugify } from "@/lib/ids";
+import { REACTIONS, type ReactionKind } from "@/db/schema";
 
 async function uniqueHandle(name: string) {
   const db = await getDb();
@@ -83,4 +86,43 @@ export async function joinCrew(formData: FormData) {
 export async function signOut() {
   await endSession();
   redirect("/");
+}
+
+/**
+ * "Steal it": put a friend's song on your On Deck, credited to them as a put-on.
+ * Never touches your All-Time order; you decide if it climbs in.
+ */
+export async function stealSong(trackId: string, fromUserId: string) {
+  const user = await requireUser();
+  const db = await getDb();
+  const giver = (await db.select().from(schema.users).where(eq(schema.users.id, fromUserId)))[0];
+  if (!giver || giver.crewId !== user.crewId || giver.id === user.id) return { ok: false as const };
+  const [allTime, onDeck] = await Promise.all([getList(user.id, "all_time"), getList(user.id, "on_deck")]);
+  if ([...allTime, ...onDeck].some((e) => e.track.id === trackId)) return { ok: true as const, already: true };
+  await saveList(user.id, "on_deck", [...onDeck.map((e) => e.track.id), trackId]);
+  const existing = await db
+    .select({ id: schema.origins.id })
+    .from(schema.origins)
+    .where(and(eq(schema.origins.userId, user.id), eq(schema.origins.trackId, trackId)));
+  if (!existing.length) {
+    await db.insert(schema.origins).values({ id: newId(), userId: user.id, trackId, fromUserId, foundVia: "friend" });
+  }
+  refresh();
+  return { ok: true as const, already: false };
+}
+
+/** Toggle one reaction (laurel, fire, cry, same) on a song or a batch of moves. */
+export async function toggleReaction(target: string, kind: string) {
+  const user = await requireUser();
+  if (!/^(song|moves):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
+  const db = await getDb();
+  const mine = and(
+    eq(schema.reactions.userId, user.id),
+    eq(schema.reactions.target, target),
+    eq(schema.reactions.kind, kind as ReactionKind),
+  );
+  const had = await db.select({ id: schema.reactions.id }).from(schema.reactions).where(mine);
+  if (had.length) await db.delete(schema.reactions).where(mine);
+  else await db.insert(schema.reactions).values({ id: newId(), userId: user.id, target, kind: kind as ReactionKind }).onConflictDoNothing();
+  return { ok: true as const, on: !had.length };
 }

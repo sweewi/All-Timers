@@ -2,6 +2,10 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Altitude } from "@/components/World";
+import { Grounds, type GroundMember } from "@/components/Grounds";
+import { StealButton } from "@/components/StealButton";
+import { Reactions, type Counts } from "@/components/Reactions";
 import { PIECES, PX_PER_M, baseFor, carvedTitle, roman, sliceFor, type Rect } from "@/lib/monument";
 
 export type MonumentSong = {
@@ -16,7 +20,18 @@ export type MonumentSong = {
   moment: string | null;
   found: string | null;
   memory: string | null;
+  /** friends who also have this song, and where they rank it */
+  echoes: Friend[];
+  /** the friend who put this person on to it */
+  from: Omit<Friend, "rank"> | null;
+  /** the viewer doesn't have it yet: offer "Steal it" */
+  steal: boolean;
+  /** friends' reactions to this song on this column */
+  reactions: Counts;
 };
+
+export type Friend = { name: string; handle: string; color: string; rank: number };
+export type Neighbor = GroundMember;
 
 const ASSET = (name: string) => `/monument/${name}.webp`;
 
@@ -36,17 +51,19 @@ export function Monument({
   isMe,
   storyHref,
   toolbar,
+  neighbors,
 }: {
-  person: { name: string; handle: string };
+  person: { id: string; name: string; handle: string; color: string };
   songs: MonumentSong[];
   isMe: boolean;
   storyHref: string;
   toolbar?: React.ReactNode;
+  neighbors: Neighbor[];
 }) {
   const [vw, setVw] = useState(1200);
   const [open, setOpen] = useState<MonumentSong | null>(null);
   const rows = useRef<(HTMLDivElement | null)[]>([]);
-  const plates = useRef<(HTMLButtonElement | null)[]>([]);
+  const plates = useRef<(HTMLDivElement | null)[]>([]);
   // extra room a row needs when its nameplate is taller than the space under the ledge
   const [extra, setExtra] = useState<number[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -87,12 +104,7 @@ export function Monument({
       const el = rootRef.current;
       if (!el) return;
       el.style.setProperty("--p", p.toFixed(4));
-      el.style.setProperty("--sy", `${window.scrollY}px`);
-      el.style.setProperty("--sky-high", (1 - smooth(0.1, 0.4, p)).toFixed(3));
-      el.style.setProperty("--sky-mid", (1 - smooth(0.8, 0.92, p)).toFixed(3));
-      el.style.setProperty("--rays", (0.45 + 0.4 * (1 - smooth(0.05, 0.75, p))).toFixed(3));
-      el.style.setProperty("--birds", (smooth(0.08, 0.2, p) * (1 - smooth(0.6, 0.75, p))).toFixed(3));
-      
+
       const vh = window.innerHeight;
       for (const r of rows.current) {
         if (!r) continue;
@@ -167,33 +179,21 @@ export function Monument({
 
   return (
     <div ref={rootRef} className={`monument ${reduced ? "monument-still" : ""}`} style={{ ["--s" as string]: s }}>
-      {/* the sky and garden behind everything */}
-      <div className="mon-bg" aria-hidden>
-        <div className="mon-layer" style={{ backgroundImage: `url(${ASSET("garden")})` }} />
-        <div className="mon-layer" style={{ backgroundImage: `url(${ASSET("sky-mid")})`, opacity: "var(--sky-mid)" }} />
-        <div className="mon-layer" style={{ backgroundImage: `url(${ASSET("sky-high")})`, opacity: "var(--sky-high)" }} />
-        <div className="mon-warm" />
-        <Birds />
-      </div>
-
-      {/* clouds drifting around the top of the column, at different depths */}
-      <div className="mon-clouds" aria-hidden>
-        <Cloud src="cloud-a" top={0} left="-22vw" width="78vw" depth={0.35} opacity={0.95} />
-        <Cloud src="cloud-b" top={skyPad + crown.h * s * 0.45} left="44vw" width="74vw" depth={0.25} opacity={0.9} />
-        <Cloud src="cloud-c" top={skyPad + crown.h * s * 1.25} left="-30vw" width="72vw" depth={0.18} opacity={0.85} />
-        <Cloud src="cloud-a" top={skyPad + crown.h * s * 2.3} left="50vw" width="64vw" depth={0.12} opacity={0.6} />
-      </div>
+      {/* the camera rides the column: high blue sky at #1, the sand at the last song */}
+      <Altitude stops={[{ y: 0, alt: 0.9 }, { y: "end", back: 1, alt: 0.31 }, { y: "end", alt: 0 }]} />
 
       <div className="relative mx-auto" style={{ width: viewW, overflowX: "clip" }}>
 
-        <header className="relative z-10 pt-24 text-center" style={{ height: skyPad }}>
-          <p className="mon-kicker">All-Timers</p>
-          <h1 className="mon-name">{person.name}</h1>
-          <p className="mon-sub">
-            {songs.length} {songs.length === 1 ? "song" : "songs"} · scroll down to go deeper
+        <header className="relative z-[3] pt-10 text-center" style={{ height: skyPad }}>
+          <p className="sticker sticker-blue -rotate-2">
+            {isMe ? "Your all-timers" : `${person.name}'s all-timers`} · {songs.length} {songs.length === 1 ? "song" : "songs"}
           </p>
           {toolbar && <div className="mt-4 flex flex-wrap justify-center gap-2">{toolbar}</div>}
         </header>
+        {/* the name, huge, behind the top of the column */}
+        <h1 className="mon-giant" style={{ top: skyPad - (mobile ? 30 : 70), fontSize: mobile ? "34vw" : `min(${Math.max(14, 92 / Math.max(3, person.name.length))}vw, 300px)` }}>
+          {person.name}
+        </h1>
 
         {top && (
           <section
@@ -214,6 +214,8 @@ export function Monument({
                   ref={(el) => {
                     plates.current[0] = el;
                   }}
+                  ownerId={person.id}
+                  align="center"
                   song={top}
                   onOpen={setOpen}
                   m={m}
@@ -274,6 +276,8 @@ export function Monument({
                   ref={(el) => {
                     plates.current[i + 1] = el;
                   }}
+                  ownerId={person.id}
+                  align={right ? "start" : "end"}
                   song={song}
                   onOpen={setOpen}
                   m={m}
@@ -286,7 +290,7 @@ export function Monument({
         })}
 
         {baseP && (
-          <section className="relative" style={{ height: Math.floor((baseP.h - (baseP.ov ?? 0)) * s) }}>
+          <section className="relative z-[2]" style={{ height: Math.floor((baseP.h - (baseP.ov ?? 0)) * s) }}>
             <div className="absolute top-0" style={{ left: -cropX, width: baseP.w * s, height: (baseP.h - (baseP.ov ?? 0)) * s }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -299,26 +303,24 @@ export function Monument({
             </div>
           </section>
         )}
-        <div className="relative z-10 pt-6 pb-16 text-center">
-          <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="mon-btn">
-            Back up to #1
-          </button>
-          {isMe && (
-            <Link href={storyHref} className="mon-btn ml-2">
-              Say why they&apos;re here
-            </Link>
-          )}
-        </div>
+        {/* the bottom of the column is the plain: friends' columns stand around it, walk to one */}
+        <div aria-hidden style={{ height: `max(0px, calc(16vh - ${Math.round(((baseP?.h ?? 0) - (baseP?.ground ?? 0)) * s)}px))` }} />
       </div>
+      <Grounds members={neighbors} skipCenter />
+      <nav className="mon-exits" aria-label="Where next">
+        <span className="mon-exits-k">{neighbors.length ? "Walk to a friend's column, or" : "That's the whole column"}</span>
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="sticker sticker-blue">
+          ↑ Fly back up to #1
+        </button>
+        <Link href="/" className="sticker sticker-paper">The plaza</Link>
+        {isMe && (
+          <Link href={storyHref} className="sticker sticker-steal">
+            Say why they&apos;re here
+          </Link>
+        )}
+      </nav>
 
-      {/* one finishing pass over everything, so renders and photographs read as one picture */}
-      <div className="mon-finish" aria-hidden>
-        <div className="mon-rays" />
-        <div className="mon-grade" />
-        <div className="mon-grain" />
-      </div>
-
-      {open && <Plaque song={open} onClose={() => setOpen(null)} isMe={isMe} storyHref={storyHref} />}
+      {open && <Plaque song={open} onClose={() => setOpen(null)} isMe={isMe} storyHref={storyHref} ownerId={person.id} ownerName={person.name} />}
     </div>
   );
 }
@@ -360,7 +362,7 @@ function Filler({ src, w, h, top, extra, k, left }: { src: string; w: number; h:
   );
 }
 
-/** The marble nameplate under each ledge. It grows to fit: titles wrap, nothing is cut. */
+/** The marble nameplate under each ledge, with the social stickers that hang off it. It grows to fit. */
 function Nameplate({
   ref,
   song,
@@ -369,6 +371,8 @@ function Nameplate({
   tier,
   style,
   big = false,
+  align,
+  ownerId,
 }: {
   song: MonumentSong;
   onOpen: (s: MonumentSong) => void;
@@ -376,26 +380,53 @@ function Nameplate({
   tier: string;
   style: React.CSSProperties;
   big?: boolean;
-  ref?: React.Ref<HTMLButtonElement>;
+  align: "start" | "end" | "center";
+  ownerId: string;
+  ref?: React.Ref<HTMLDivElement>;
 }) {
   const k = big ? 1.35 : 1;
+  const tags = song.echoes.slice(0, 3);
+  const EMO: Record<string, string> = { laurel: "🌿", fire: "🔥", cry: "😭", same: "🤝" };
+  const reacts = Object.entries(song.reactions ?? {}).filter(([, v]) => v && v.n > 0);
   return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={() => onOpen(song)}
-      className={`mon-tag mon-tag-${tier}`}
-      style={{ ...style, ["--fs" as string]: `${Math.max(big ? 15 : 13, 0.066 * m * k)}px` }}
-      aria-label={`#${song.rank} ${song.name} by ${song.artists}`}
-    >
-      <span className="mon-numeral" style={{ fontSize: Math.max(10, 0.044 * m * k) }}>
-        {roman(song.rank)}
-      </span>
-      <span className="mon-title">{carvedTitle(song.name)}</span>
-      <span className="mon-artist" style={{ fontSize: Math.max(9.5, 0.036 * m * k) }}>
-        {song.artists}
-      </span>
-    </button>
+    <div ref={ref} className="mon-tagwrap" style={{ ...style, alignItems: align === "start" ? "flex-start" : align === "end" ? "flex-end" : "center" }}>
+      <button
+        type="button"
+        onClick={() => onOpen(song)}
+        className={`mon-tag mon-tag-${tier}`}
+        style={{ ["--fs" as string]: `${Math.max(big ? 15 : 13, 0.066 * m * k)}px`, width: "100%" }}
+        aria-label={`#${song.rank} ${song.name} by ${song.artists}`}
+      >
+        <span className="mon-numeral" style={{ fontSize: Math.max(10, 0.044 * m * k) }}>
+          {roman(song.rank)}
+        </span>
+        <span className="mon-title">{carvedTitle(song.name)}</span>
+        <span className="mon-artist" style={{ fontSize: Math.max(9.5, 0.036 * m * k) }}>
+          {song.artists}
+        </span>
+      </button>
+      {(tags.length > 0 || song.from || song.steal || reacts.length > 0) && (
+        <div className={`mon-stickers ${align === "end" ? "justify-end" : align === "center" ? "justify-center" : ""}`}>
+          {song.from && (
+            <Link href={`/u/${song.from.handle}`} className="sticker sticker-paper" style={{ ["--c" as string]: song.from.color }}>
+              <i style={{ background: song.from.color }} /> put on by {song.from.name}
+            </Link>
+          )}
+          {tags.map((t) => (
+            <Link key={t.handle} href={`/u/${t.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: t.color }} title={`${t.name} has it at #${t.rank}`}>
+              {t.name} #{t.rank}
+            </Link>
+          ))}
+          {song.echoes.length > 3 && <span className="sticker sticker-paper">+{song.echoes.length - 3}</span>}
+          {reacts.length > 0 && (
+            <button type="button" onClick={() => onOpen(song)} className="sticker sticker-paper" title="Friends' reactions">
+              {reacts.map(([k, v]) => `${EMO[k]}${v!.n > 1 ? v!.n : ""}`).join(" ")}
+            </button>
+          )}
+          {song.steal && <StealButton trackId={song.id} fromUserId={ownerId} />}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -427,43 +458,21 @@ function Cover({
   );
 }
 
-function Cloud({ src, top, left, width, depth, opacity }: { src: string; top: number; left: string; width: string; depth: number; opacity: number }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={ASSET(src)}
-      alt=""
-      aria-hidden
-      className="mon-cloud"
-      style={{ top, left, width, opacity, ["--depth" as string]: depth }}
-    />
-  );
-}
-
-function Birds() {
-  // small distant flocks crossing the sky now and then
-  return (
-    <div className="mon-birds">
-      {[0, 1, 2].map((f) => (
-        <svg key={f} className={`mon-flock mon-flock-${f}`} viewBox="0 0 120 50" aria-hidden>
-          {[
-            [10, 30, 1], [28, 22, 0.8], [44, 34, 0.9], [60, 18, 0.7], [76, 28, 0.85], [96, 20, 0.6],
-          ].map(([x, y, sc], i) => (
-            <path
-              key={i}
-              className="mon-bird"
-              style={{ animationDelay: `${i * 0.13}s` }}
-              transform={`translate(${x} ${y}) scale(${sc})`}
-              d="M-6 0 Q-3 -3 0 0 Q3 -3 6 0"
-            />
-          ))}
-        </svg>
-      ))}
-    </div>
-  );
-}
-
-function Plaque({ song, onClose, isMe, storyHref }: { song: MonumentSong; onClose: () => void; isMe: boolean; storyHref: string }) {
+function Plaque({
+  song,
+  onClose,
+  isMe,
+  storyHref,
+  ownerId,
+  ownerName,
+}: {
+  song: MonumentSong;
+  onClose: () => void;
+  isMe: boolean;
+  storyHref: string;
+  ownerId: string;
+  ownerName: string;
+}) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
@@ -495,6 +504,27 @@ function Plaque({ song, onClose, isMe, storyHref }: { song: MonumentSong; onClos
             {song.memory && <p className="text-sm italic text-[#6e624f]">{song.memory}</p>}
           </div>
         )}
+        {(song.echoes.length > 0 || song.steal) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#d9cfbd] pt-4 text-sm text-[#5b5143]">
+            {song.echoes.length > 0 ? (
+              <>
+                <span>Also on</span>
+                {song.echoes.map((t) => (
+                  <Link key={t.handle} href={`/u/${t.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: t.color }}>
+                    {t.name} #{t.rank}
+                  </Link>
+                ))}
+              </>
+            ) : (
+              <span>Only {ownerName} has this one.</span>
+            )}
+            {song.steal && <span className="ml-auto"><StealButton trackId={song.id} fromUserId={ownerId} /></span>}
+          </div>
+        )}
+        <div className="mt-4 flex items-center gap-3 border-t border-[#d9cfbd] pt-4 text-sm text-[#5b5143]">
+          <span>{isMe ? "Friends say" : "React"}</span>
+          <Reactions target={`song:${ownerId}:${song.id}`} initial={song.reactions} canReact={!isMe} />
+        </div>
         <iframe
           title="Spotify player"
           src={`https://open.spotify.com/embed/track/${song.id}?utm_source=generator&theme=0`}

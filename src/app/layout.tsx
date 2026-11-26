@@ -5,6 +5,8 @@ import localFont from "next/font/local";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
+import { World } from "@/components/World";
+import { Footpath } from "@/components/Footpath";
 
 const roman = localFont({
   src: [
@@ -29,6 +31,14 @@ const body = localFont({
   ],
   variable: "--font-body",
 });
+const tall = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/oswald/files/oswald-latin-200-normal.woff2", weight: "200" },
+    { path: "../../node_modules/@fontsource/oswald/files/oswald-latin-300-normal.woff2", weight: "300" },
+    { path: "../../node_modules/@fontsource/oswald/files/oswald-latin-500-normal.woff2", weight: "500" },
+  ],
+  variable: "--font-tall",
+});
 const display = localFont({
   src: "../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2",
   variable: "--font-display",
@@ -45,20 +55,24 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} ${body.variable} h-full antialiased`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} ${body.variable} ${tall.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
+        <World />
         <header data-site-header className="border-b border-line">
           <nav className="mx-auto flex max-w-5xl items-center gap-5 px-5 py-4 text-sm">
             <Link href="/" className="brand">
-              All-Timers
+              All<i>·</i>Timers
             </Link>
             {user && (
               <>
                 <Link href={`/u/${user.handle}`} className="text-muted hover:text-foreground">
-                  My list
+                  My column
                 </Link>
-                <Link href="/compare" className="text-muted hover:text-foreground">
+                <Link href="/compare" className="hidden text-muted hover:text-foreground sm:inline">
                   Compare
+                </Link>
+                <Link href="/me/stories" className="hidden text-muted hover:text-foreground md:inline">
+                  Why room
                 </Link>
                 <span className="flex-1" />
                 <Link href="/settings" className="flex items-center gap-2 text-muted hover:text-foreground">
@@ -70,6 +84,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </nav>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">{children}</main>
+        {user && <Footpath handle={user.handle} />}
       </body>
     </html>
   );

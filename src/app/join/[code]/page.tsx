@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { joinCrew } from "@/app/actions";
+import { Altitude } from "@/components/World";
 
 export default async function JoinPage({ params, searchParams }: PageProps<"/join/[code]">) {
   const { code } = await params;
@@ -30,7 +31,8 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
   }
 
   return (
-    <div className="mx-auto max-w-md py-10">
+    <div className="join-page mx-auto max-w-md py-2">
+      <Altitude base={0} range={0.06} />
       <p className="text-sm uppercase tracking-widest text-muted">You&apos;re invited to</p>
       <h1 className="rank-num mt-1 text-5xl">{crew.name}</h1>
       {members.length > 0 && (

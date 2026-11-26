@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getCrewMembers, getList, type Entry } from "@/lib/lists";
 import { artistList } from "@/lib/songs";
 import { Art, TrackTitle } from "@/components/track";
+import { Altitude } from "@/components/World";
 
 export default async function ComparePage({ searchParams }: PageProps<"/compare">) {
   const viewer = await requireUser();
@@ -15,6 +16,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
 
   return (
     <div>
+      <Altitude base={0.58} range={0.15} />
       <h1 className="rank-num text-5xl">Compare</h1>
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">{a.id === viewer.id ? "You" : a.name} vs</span>
@@ -82,6 +84,7 @@ async function Comparison({ a, b }: { a: User; b: User }) {
 
   return (
     <div className="mt-10 space-y-12">
+      <Altitude base={0.58} range={0.15} />
       <section className="grid gap-4 sm:grid-cols-3">
         <Stat label="Songs on both lists" value={shared.length} />
         <Stat label="Same song, different version" value={diffVersion.length} />
@@ -183,6 +186,7 @@ async function Comparison({ a, b }: { a: User; b: User }) {
 function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
+      <Altitude base={0.58} range={0.15} />
       <div className="rank-num text-5xl">{value}</div>
       <div className="mt-1 text-sm text-muted">{label}</div>
       {hint && <div className="text-xs text-muted/70">{hint}</div>}

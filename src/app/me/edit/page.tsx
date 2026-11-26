@@ -6,6 +6,7 @@ import { getCrewMembers, getList } from "@/lib/lists";
 import { artistLine } from "@/lib/songs";
 import { EditClient, type EditItem } from "./EditClient";
 import { hasStory, toStoryValues } from "@/lib/story-values";
+import { Altitude } from "@/components/World";
 
 export default async function EditPage({ searchParams }: PageProps<"/me/edit">) {
   const user = await requireUser();
@@ -30,6 +31,7 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
 
   return (
     <div>
+      <Altitude base={0.3} range={0.25} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={`/u/${user.handle}${kind === "on_deck" ? "?list=on_deck" : ""}`} className="text-sm text-muted">

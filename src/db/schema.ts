@@ -152,6 +152,27 @@ export const rankEvents = pgTable(
   (t) => [index("events_user_idx").on(t.userId), index("events_created_idx").on(t.createdAt)],
 );
 
+export const REACTIONS = ["laurel", "fire", "cry", "same"] as const;
+export type ReactionKind = (typeof REACTIONS)[number];
+
+/**
+ * A friend's reaction to something: a song on someone's column ("song:<ownerId>:<trackId>")
+ * or a batch of moves in the feed ("moves:<batchId>"). One of each kind per person.
+ */
+export const reactions = pgTable(
+  "reactions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    target: text("target").notNull(),
+    kind: text("kind").$type<ReactionKind>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("reactions_user_target_kind_idx").on(t.userId, t.target, t.kind), index("reactions_target_idx").on(t.target)],
+);
+
 /** Small key/value store (e.g. the app owner's Spotify refresh token). */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),

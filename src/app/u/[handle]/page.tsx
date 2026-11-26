@@ -12,6 +12,10 @@ import { artistLine } from "@/lib/songs";
 import { FOUND_VIA_OPTIONS } from "@/lib/stories";
 import type { Entry } from "@/lib/lists";
 import { Monument, type MonumentSong } from "./Monument";
+import { getSocial } from "@/lib/social";
+import { getCrewOverview } from "@/lib/lists";
+import { Altitude } from "@/components/World";
+import { getReactions, songTarget } from "@/lib/reactions";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -37,6 +41,25 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   // The monument is the default way to see an all-time list; ?view=list is the plain list.
   if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
+    const [social, overview, reacts] = await Promise.all([
+      getSocial(viewer.crewId, viewer.id),
+      getCrewOverview(viewer.crewId),
+      getReactions(allTime.map((e) => songTarget(person.id, e.track.id)), viewer.id),
+    ]);
+    const echoes = social.echoesFor(person.id);
+    // the next columns to visit: everyone else with a list, starting after this person
+    const order = overview.filter((o) => o.count > 0);
+    const at = order.findIndex((o) => o.member.id === person.id);
+    const neighbors = [...order.slice(at + 1), ...order.slice(0, Math.max(0, at))]
+      .filter((o) => o.member.id !== person.id)
+      .map((o) => ({
+        name: o.member.id === viewer.id ? "You" : o.member.name,
+        handle: o.member.handle,
+        color: o.member.color,
+        count: o.count,
+        cover: o.top[0]?.imageUrl ?? null,
+        isMe: o.member.id === viewer.id,
+      }));
     const songs: MonumentSong[] = allTime.map((e) => ({
       id: e.track.id,
       rank: e.position,
@@ -49,11 +72,18 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       moment: e.origin?.moment ?? null,
       found: foundText(e.origin),
       memory: [e.origin?.story, e.origin?.whenText].filter(Boolean).join(" · ") || null,
+      echoes: echoes(e.track)
+        .filter((h) => h.user.id !== person.id)
+        .map((h) => ({ name: h.user.id === viewer.id ? "You" : h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
+      from: e.origin?.fromUser ? { name: e.origin.fromUser.name, handle: e.origin.fromUser.handle, color: e.origin.fromUser.color } : null,
+      steal: !isMe && !social.has(e.track),
+      reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
     }));
     const btn = "mon-btn";
     return (
       <Monument
-        person={{ name: person.name, handle: person.handle }}
+        person={{ id: person.id, name: person.name, handle: person.handle, color: person.color }}
+        neighbors={neighbors}
         songs={songs}
         isMe={isMe}
         storyHref={`/me/stories?list=all_time`}
@@ -78,6 +108,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   return (
     <div>
+      <Altitude base={0.4} range={0.2} />
       <section className="flex flex-wrap items-end gap-6">
         {allTime[0] && <Art track={allTime[0].track} size={120} />}
         <div className="min-w-0 flex-1">

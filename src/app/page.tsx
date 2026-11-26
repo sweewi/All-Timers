@@ -4,8 +4,16 @@ import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCrewFeed, getCrewOverview, type FeedItem } from "@/lib/lists";
 import { Art } from "@/components/track";
-import { CopyButton } from "@/components/client";
 import { ShareInvite } from "@/components/ShareInvite";
+import { Altitude } from "@/components/World";
+import { Grounds, type GroundMember } from "@/components/Grounds";
+import { Portal } from "@/components/Portal";
+import { StealButton } from "@/components/StealButton";
+import { getSocial } from "@/lib/social";
+import { getReactions, movesTarget } from "@/lib/reactions";
+import { Reactions, type Counts } from "@/components/Reactions";
+import { artistLine } from "@/lib/songs";
+import { carvedTitle } from "@/lib/monument";
 import { setupCrew } from "./actions";
 import { after } from "next/server";
 import { backfillTracks } from "@/lib/spotify";
@@ -16,101 +24,194 @@ export default async function Home() {
 
   const db = await getDb();
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)))[0];
-  const [overview, feed] = await Promise.all([getCrewOverview(user.crewId), getCrewFeed(user.crewId)]);
+  const [overview, feed, social] = await Promise.all([
+    getCrewOverview(user.crewId),
+    getCrewFeed(user.crewId, 12),
+    getSocial(user.crewId, user.id),
+  ]);
   const mine = overview.find((o) => o.member.id === user.id);
+  const reacts = await getReactions(feed.map((f) => movesTarget(f.batchId)), user.id);
   after(() => backfillTracks());
+  const members: GroundMember[] = overview.map(({ member, count, top }) => ({
+    name: member.name,
+    handle: member.handle,
+    color: member.color,
+    count,
+    cover: top[0]?.imageUrl ?? null,
+    isMe: member.id === user.id,
+  }));
+  const invite = `/join/${crew.inviteCode}`;
 
   return (
-    <div className="space-y-12">
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-widest text-muted">{crew.name}</p>
-          <h1 className="rank-num mt-1 text-5xl">Everyone&apos;s all-timers</h1>
-        </div>
-        {overview.length > 1 && <CopyButton text={`/join/${crew.inviteCode}`} label="Invite friends" />}
+    <div className="home">
+      {/* scrolling down lifts you off the sand and up into the clouds */}
+      <Altitude stops={[{ y: 0, alt: 0 }, { y: 1, alt: 0.4 }, { y: "end", alt: 0.92 }]} />
+      <Grounds members={members} title={/all-timers$/i.test(crew.name) ? "All·Timers" : crew.name} ghosts={Math.max(0, 3 - members.length)} />
+
+      <section className="hero">
+        <p className="sticker sticker-blue -rotate-2">{crew.name}</p>
+        <h1 className="hero-line">
+          Hey {user.name.split(" ")[0]},
+          <br />
+          <em>{feed.length ? "the columns moved." : "pick a column."}</em>
+        </h1>
+        <p className="hero-sub">Tap anyone&apos;s column to climb it. Scroll to fly up.</p>
+        {mine && mine.count === 0 && (
+          <Link href="/me/import" className="sticker sticker-steal pointer-events-auto mt-4 inline-block rotate-1 text-base">
+            Raise your column →
+          </Link>
+        )}
+        {feed.length > 0 && <Ticker items={feed.map(tickerLine)} />}
       </section>
 
-      {overview.length === 1 && (
-        <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-          <h2 className="rank-num text-4xl">It&apos;s just you so far.</h2>
-          <p className="mt-2 max-w-xl text-muted">
-            This gets good when everyone&apos;s list is here. Send the group your invite link: they tap it, type their
-            name, paste their list, and they&apos;re in. Nobody needs an account or a password.
-          </p>
-          <div className="mt-5">
-            <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
+      <div className="home-sections">
+        <section>
+          <h2 className="tall-h">
+            Fresh moves <span className="sticker sticker-paper rotate-3">{feed.length ? "live" : "quiet so far"}</span>
+          </h2>
+          {feed.length === 0 ? (
+            <p className="paper-note">Nothing yet. Adds, climbs and drops land here the second anyone touches their list.</p>
+          ) : (
+            <div className="scraps">
+              {feed.map((item, i) => (
+                <Scrap key={item.batchId} item={item} i={i} reacts={reacts[movesTarget(item.batchId)]} mine={item.user.id === user.id} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="tall-h">Common ground</h2>
+          <p className="tall-sub">Songs more than one of you swear by.</p>
+          {social.shared.length === 0 ? (
+            <p className="paper-note">
+              No overlaps yet. {overview.length < 2 ? "It takes two columns." : "Everyone's taste is their own, for now."}
+            </p>
+          ) : (
+            <div className="rail">
+              {social.shared.slice(0, 14).map((sh) => (
+                <div key={sh.track.id} className="medal">
+                  <span className="medal-art">
+                    {sh.track.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={sh.track.imageUrl} alt="" />
+                    )}
+                    <span className="medal-count">×{sh.holders.length}</span>
+                  </span>
+                  <b>{carvedTitle(sh.track.name)}</b>
+                  <small>{artistLine(sh.track.artists)}</small>
+                  <span className="mt-2 flex flex-wrap justify-center gap-1">
+                    {sh.holders.map((h) => (
+                      <Link key={h.user.id} href={`/u/${h.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: h.user.color }}>
+                        {h.user.id === user.id ? "You" : h.user.name} #{h.rank}
+                      </Link>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="tall-h">
+            Steal from friends <span className="sticker sticker-steal -rotate-3">new picks daily</span>
+          </h2>
+          <p className="tall-sub">Their all-timers you don&apos;t have yet. Steal one and it lands in your On Deck, credited to them.</p>
+          {social.picks.length === 0 ? (
+            <p className="paper-note">{overview.length < 2 ? "Once friends add their lists, their best songs show up here." : "You already have everything your friends love. Suspicious."}</p>
+          ) : (
+            <div className="rail">
+              {social.picks.map((pk, i) => (
+                <div key={pk.track.id} className="loot" style={{ rotate: `${((i * 37) % 5) - 2}deg` }}>
+                  {pk.track.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pk.track.imageUrl} alt="" className="loot-art" />
+                  )}
+                  <b>{carvedTitle(pk.track.name)}</b>
+                  <small>{pk.artists}</small>
+                  <Link href={`/u/${pk.from.handle}`} className="sticker sticker-friend mt-2 self-start" style={{ ["--c" as string]: pk.from.color }}>
+                    {pk.from.name}&apos;s #{pk.rank}
+                  </Link>
+                  <span className="mt-2">
+                    <StealButton trackId={pk.track.id} fromUserId={pk.from.id} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="invite">
+          <h2 className="tall-h">Doors</h2>
+          <p className="tall-sub">Every room in the place.</p>
+          <div className="doors">
+            <Portal href={`/u/${user.handle}`} label="Your column" sub={mine?.count ? `${mine.count} songs` : "raise it"} cover={mine?.top[0]?.imageUrl} tone="night" />
+            <Portal href="/compare" label="Compare" sub="you vs anyone" tone="dawn" inside={<span className="portal-word">VS</span>} />
+            <Portal href="/me/stories" label="The why room" sub="tell the stories" tone="sea" inside={<span className="portal-word">“ ”</span>} />
+            <Portal href="/me/import" label="Add songs" sub="from Spotify" tone="night" inside={<span className="portal-word">+</span>} />
+          </div>
+          <div className="paper-note mt-10 max-w-xl">
+            <b>Bring more people in.</b> Columns get interesting in a crowd.
+            <div className="mt-3">
+              <ShareInvite path={invite} groupName={crew.name} />
+            </div>
           </div>
         </section>
-      )}
+      </div>
+    </div>
+  );
+}
 
-      {mine && mine.count === 0 && (
-        <Link
-          href="/me/import"
-          className="block rounded-2xl border border-accent/50 bg-accent/10 p-5 hover:bg-accent/15"
-        >
-          <div className="font-medium text-accent">Add your all-time list →</div>
-          <div className="mt-1 text-sm text-muted">Copy it from Spotify in about a minute. We&apos;ll walk you through it.</div>
-        </Link>
-      )}
+/** The wire: a strip of tape running across the plaza with everything that just happened. */
+function Ticker({ items }: { items: string[] }) {
+  const run = items.join("   ✦   ");
+  return (
+    <div className="ticker" aria-label="Latest moves">
+      <div className="ticker-run">
+        <span>{run}   ✦   </span>
+        <span aria-hidden>{run}   ✦   </span>
+      </div>
+    </div>
+  );
+}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {overview.map(({ member, count, top }) => (
-          <Link
-            key={member.id}
-            href={`/u/${member.handle}`}
-            className="group min-w-0 rounded-2xl border border-line bg-surface p-5 transition hover:border-foreground/30"
-          >
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full" style={{ background: member.color }} />
-              <span className="font-medium">{member.name}</span>
-              <span className="ml-auto text-sm text-muted">{count ? `${count} songs` : "no list yet"}</span>
-            </div>
-            {top[0] ? (
-              <div className="mt-4 flex gap-3">
-                <Art track={top[0]} size={64} />
-                <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-widest text-muted">#1 all time</div>
-                  <div className="truncate font-medium">{top[0].name}</div>
-                  <div className="mt-1 truncate text-sm text-muted">
-                    {top.slice(1).map((t, i) => (
-                      <span key={t.id}>
-                        {i > 0 && " · "}#{i + 2} {t.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 h-16 rounded-lg border border-dashed border-line" />
-            )}
-          </Link>
-        ))}
-      </section>
+function tickerLine(item: FeedItem) {
+  const who = item.user.name;
+  const adds = item.events.filter((e) => e.type === "add");
+  const moves = item.events.filter((e) => e.type === "move").sort((x, y) => (y.fromPos! - y.toPos!) - (x.fromPos! - x.toPos!));
+  if (adds.length > 3) return `${who} added ${adds.length} songs`;
+  const m = moves[0];
+  if (m) return `${who} moved ${carvedTitle(m.track.name)} ${m.fromPos! > m.toPos! ? "up" : "down"} to #${m.toPos}`;
+  if (adds[0]) return `${who} added ${carvedTitle(adds[0].track.name)} at #${adds[0].toPos}`;
+  const r = item.events.find((e) => e.type === "remove");
+  return r ? `${who} dropped ${carvedTitle(r.track.name)}` : `${who} touched their list`;
+}
 
-      <section>
-        <h2 className="rank-num text-3xl">Latest moves</h2>
-        {feed.length === 0 ? (
-          <p className="mt-3 text-muted">Nothing yet. Lists, moves and new songs will show up here.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-line">
-            {feed.map((item) => (
-              <FeedRow key={item.batchId} item={item} />
-            ))}
-          </ul>
-        )}
-      </section>
+function Scrap({ item, i, reacts, mine }: { item: FeedItem; i: number; reacts?: Counts; mine: boolean }) {
+  return (
+    <div className="scrap" style={{ rotate: `${[-1.6, 1.2, -0.6, 1.8, -1.1, 0.7][i % 6]}deg` }}>
+      <span className="scrap-tape" />
+      <Art track={item.events[0].track} size={64} />
+      <div className="min-w-0 flex-1">
+        <FeedText item={item} />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <time className="text-xs text-muted">{timeAgo(item.createdAt)}</time>
+          <Reactions target={movesTarget(item.batchId)} initial={reacts} canReact={!mine} size="sm" />
+        </div>
+      </div>
     </div>
   );
 }
 
 const listName = (k: string) => (k === "on_deck" ? "On Deck" : "All-Time list");
 
-function FeedRow({ item }: { item: FeedItem }) {
+function FeedText({ item }: { item: FeedItem }) {
   const adds = item.events.filter((e) => e.type === "add");
   const moves = item.events.filter((e) => e.type === "move");
   const removes = item.events.filter((e) => e.type === "remove");
   const name = (
-    <Link href={`/u/${item.user.handle}`} className="font-medium" style={{ color: item.user.color }}>
+    <Link href={`/u/${item.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: item.user.color }}>
       {item.user.name}
     </Link>
   );
@@ -124,16 +225,16 @@ function FeedRow({ item }: { item: FeedItem }) {
   } else {
     // Small edits read best one change at a time; the biggest climbs first.
     const parts: React.ReactNode[] = [];
-    for (const a of adds) parts.push(<>added <b>{a.track.name}</b> at #{a.toPos}</>);
+    for (const a of adds) parts.push(<>added <b>{carvedTitle(a.track.name)}</b> at #{a.toPos}</>);
     for (const m of [...moves].sort((x, y) => (y.fromPos! - y.toPos!) - (x.fromPos! - x.toPos!)).slice(0, 3)) {
       const up = m.fromPos! > m.toPos!;
       parts.push(
         <>
-          moved <b>{m.track.name}</b> {up ? "up" : "down"} #{m.fromPos} → #{m.toPos}
+          moved <b>{carvedTitle(m.track.name)}</b> {up ? "up" : "down"} #{m.fromPos} → #{m.toPos}
         </>,
       );
     }
-    for (const r of removes.slice(0, 2)) parts.push(<>dropped <b>{r.track.name}</b></>);
+    for (const r of removes.slice(0, 2)) parts.push(<>dropped <b>{carvedTitle(r.track.name)}</b></>);
     text = (
       <>
         {name}{" "}
@@ -147,13 +248,7 @@ function FeedRow({ item }: { item: FeedItem }) {
       </>
     );
   }
-  return (
-    <li className="flex items-center gap-3 py-3 text-sm">
-      <Art track={item.events[0].track} size={36} />
-      <div className="flex-1">{text}</div>
-      <time className="shrink-0 text-xs text-muted">{timeAgo(item.createdAt)}</time>
-    </li>
-  );
+  return <div className="text-[15px] leading-snug">{text}</div>;
 }
 
 function timeAgo(d: Date) {
@@ -172,9 +267,10 @@ async function SignedOut() {
     : null;
   return (
     <div className="mx-auto max-w-xl py-12">
-      <h1 className="rank-num text-6xl leading-none">Everyone&apos;s all-time favorite songs, ranked.</h1>
+      <Altitude base={0.3} range={0.1} />
+      <h1 className="tall-h text-[clamp(56px,12vw,120px)]">Everyone&apos;s all-time songs, standing tall.</h1>
       {crew ? (
-        <p className="mt-6 text-muted">
+        <p className="paper-note mt-6">
           This is {crew.name}. To join, ask {admin?.name ?? "whoever runs it"} for the invite link. Already in on another
           device? Open Settings there and tap &ldquo;Make a sign-in link.&rdquo;
         </p>
