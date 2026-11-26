@@ -93,7 +93,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
             On your phone instead? In Spotify tap ••• on a song → Share → Copy link, and paste here one at a time.
           </span>
         </div>
-        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
       </div>
 
       {preview && preview.tracks.length > 0 && (

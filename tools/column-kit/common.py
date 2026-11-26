@@ -4,6 +4,7 @@ Units are meters. The column is 1.0 m in diameter, axis along Z, viewed from the
 front (-Y) by an orthographic camera so stacked renders line up exactly.
 """
 import math
+import os
 import random
 
 import bpy
@@ -23,31 +24,34 @@ def reset():
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
-    sc.cycles.samples = 20
+    sc.cycles.samples = int(os.environ.get("SAMPLES", "48"))
     sc.cycles.use_adaptive_sampling = True
-    sc.cycles.adaptive_threshold = 0.04
-    sc.cycles.diffuse_bounces = 2
+    sc.cycles.adaptive_threshold = 0.015
+    sc.cycles.diffuse_bounces = 3
     sc.cycles.glossy_bounces = 2
     sc.cycles.transmission_bounces = 0
-    sc.cycles.transparent_max_bounces = 4
+    sc.cycles.transparent_max_bounces = 12
     sc.cycles.use_denoising = True
     try:
         sc.cycles.denoiser = "OPENIMAGEDENOISE"
     except Exception:
         pass
-    sc.cycles.max_bounces = 3
+    sc.cycles.max_bounces = 6
     sc.render.film_transparent = True
     sc.render.image_settings.file_format = "PNG"
     sc.render.image_settings.color_mode = "RGBA"
     sc.view_settings.view_transform = "AgX"
     sc.view_settings.look = "AgX - Base Contrast"
-    sc.view_settings.exposure = 0.5
+    sc.view_settings.look = os.environ.get("LOOK", "AgX - Base Contrast")
+    sc.view_settings.exposure = float(os.environ.get("EXPO", "0.35"))
+    sc.render.filter_size = 1.2
     world()
     sun()
     return sc
 
 
-def world(strength=0.85):
+def world(strength=None):
+    strength = strength if strength is not None else float(os.environ.get("WORLD", "0.62"))
     w = bpy.data.worlds.new("World")
     bpy.context.scene.world = w
     w.use_nodes = True
@@ -67,7 +71,7 @@ def world(strength=0.85):
     hsv.inputs["Saturation"].default_value = 0.45
     warm = nt.nodes.new("ShaderNodeMix"); warm.data_type = "RGBA"; warm.blend_type = "MULTIPLY"
     warm.inputs["Factor"].default_value = 1.0
-    warm.inputs["B"].default_value = (1.0, 0.93, 0.84, 1)
+    warm.inputs["B"].default_value = (0.95, 0.97, 1.0, 1)   # slightly cool skylight fill
     nt.links.new(tex.outputs["Color"], hsv.inputs["Color"])
     nt.links.new(hsv.outputs["Color"], warm.inputs["A"])
     nt.links.new(warm.outputs["Result"], bg.inputs["Color"])
@@ -75,15 +79,16 @@ def world(strength=0.85):
 
 
 def sun():
-    """Warm sun from upper left and slightly in front: golden highlights, real shadows."""
+    """Late-morning golden sun from the left and a little in front: one bright warm
+    side, a soft cool shadow side, so the stone reads round. Same light in every piece."""
     d = bpy.data.lights.new("Sun", "SUN")
-    d.energy = 5.0
-    d.color = (1.0, 0.82, 0.58)
-    d.angle = math.radians(1.2)
+    d.energy = float(os.environ.get("SUN", "6.5"))
+    d.color = (1.0, 0.80, 0.55)
+    d.angle = math.radians(2.6)      # soft shadow edges, like a real sun
     o = bpy.data.objects.new("Sun", d)
     bpy.context.collection.objects.link(o)
-    # elevation ~38 deg, coming from the left-front
-    o.rotation_euler = (math.radians(50), 0, math.radians(-62))
+    # light arrives from (-0.80, -0.22, 0.56): left, slightly front, ~34 deg up
+    o.rotation_euler = Vector((0.80, 0.22, -0.56)).to_track_quat("-Z", "Y").to_euler()
     return o
 
 

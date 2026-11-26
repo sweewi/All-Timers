@@ -101,7 +101,7 @@ export function StoryMode({
       <div
         key={item.id}
         className="mt-6 overflow-hidden rounded-3xl border border-line"
-        style={{ background: `linear-gradient(160deg, ${tint}cc 0%, var(--surface) 55%)` }}
+        style={{ background: `linear-gradient(160deg, ${tint}44 0%, var(--surface) 60%)` }}
       >
         <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-end">
           {item.imageUrl ? (

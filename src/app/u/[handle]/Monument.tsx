@@ -46,6 +46,9 @@ export function Monument({
   const [vw, setVw] = useState(1200);
   const [open, setOpen] = useState<MonumentSong | null>(null);
   const rows = useRef<(HTMLDivElement | null)[]>([]);
+  const plates = useRef<(HTMLButtonElement | null)[]>([]);
+  // extra room a row needs when its nameplate is taller than the space under the ledge
+  const [extra, setExtra] = useState<number[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
 
@@ -87,9 +90,9 @@ export function Monument({
       el.style.setProperty("--sy", `${window.scrollY}px`);
       el.style.setProperty("--sky-high", (1 - smooth(0.1, 0.4, p)).toFixed(3));
       el.style.setProperty("--sky-mid", (1 - smooth(0.8, 0.92, p)).toFixed(3));
-      el.style.setProperty("--rays", (Math.pow(1 - smooth(0, 0.55, p), 1.4) * 0.75).toFixed(3));
+      el.style.setProperty("--rays", (0.45 + 0.4 * (1 - smooth(0.05, 0.75, p))).toFixed(3));
       el.style.setProperty("--birds", (smooth(0.08, 0.2, p) * (1 - smooth(0.6, 0.75, p))).toFixed(3));
-      el.style.setProperty("--warm", (0.85 - 0.55 * p).toFixed(3));
+      
       const vh = window.innerHeight;
       for (const r of rows.current) {
         if (!r) continue;
@@ -113,6 +116,35 @@ export function Monument({
     };
   }, [s]);
 
+  // Rows stretch (with a filler of plain shaft) so a long nameplate never covers the next song.
+  useLayoutEffect(() => {
+    const m = PX_PER_M * s;
+    const coverTop = (i: number) => {
+      // where the next piece's frame starts, measured from the top of row i+1
+      const name = slices[i];
+      const p = name ? PIECES[name] : null;
+      return p?.cover ? (p.cover[1] - (p.ov ?? 0)) * s - 0.13 * m : 0.5 * m;
+    };
+    const measure = () => {
+      const next: number[] = [];
+      plates.current.forEach((el, i) => {
+        if (!el) return;
+        const row = rows.current[i];
+        if (!row) return;
+        const baseH = Number(row.dataset.base || 0);
+        const bottom = el.offsetTop + el.offsetHeight;
+        const limit = baseH + coverTop(i) - 0.05 * m;
+        next[i] = Math.max(0, Math.ceil(bottom - limit));
+      });
+      setExtra((prev) => (prev.length === next.length && prev.every((v, k) => v === next[k]) ? prev : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    plates.current.forEach((el) => el && ro.observe(el));
+    document.fonts?.ready.then(measure);
+    return () => ro.disconnect();
+  }, [s, slices, songs]);
+
   const px = (v: number) => `${v * s}px`;
   const place = (r: Rect, extra?: React.CSSProperties): React.CSSProperties => ({
     position: "absolute",
@@ -126,6 +158,12 @@ export function Monument({
   const crown = PIECES.crown;
   const baseP = PIECES[base];
   const skyPad = mobile ? 180 : 260;
+  const m = PX_PER_M * s; // CSS pixels per meter
+  // the overlap strip: each piece fades in over the bottom of the one above it
+  const fadeTop = (ov: number): React.CSSProperties => {
+    const g = `linear-gradient(to bottom, transparent 0, #000 ${ov * s}px)`;
+    return { marginTop: -ov * s, WebkitMaskImage: g, maskImage: g };
+  };
 
   return (
     <div ref={rootRef} className={`monument ${reduced ? "monument-still" : ""}`} style={{ ["--s" as string]: s }}>
@@ -135,16 +173,15 @@ export function Monument({
         <div className="mon-layer" style={{ backgroundImage: `url(${ASSET("sky-mid")})`, opacity: "var(--sky-mid)" }} />
         <div className="mon-layer" style={{ backgroundImage: `url(${ASSET("sky-high")})`, opacity: "var(--sky-high)" }} />
         <div className="mon-warm" />
-        <div className="mon-rays" />
         <Birds />
       </div>
 
       {/* clouds drifting around the top of the column, at different depths */}
       <div className="mon-clouds" aria-hidden>
-        <Cloud src="cloud-a" top={20} left="-18vw" width="70vw" depth={0.35} opacity={0.95} />
-        <Cloud src="cloud-b" top={skyPad + crown.h * s * 0.5} left="52vw" width="62vw" depth={0.25} opacity={0.9} />
-        <Cloud src="cloud-c" top={skyPad + crown.h * s * 1.3} left="-22vw" width="60vw" depth={0.18} opacity={0.8} />
-        <Cloud src="cloud-a" top={skyPad + crown.h * s * 2.4} left="58vw" width="55vw" depth={0.12} opacity={0.55} />
+        <Cloud src="cloud-a" top={0} left="-22vw" width="78vw" depth={0.35} opacity={0.95} />
+        <Cloud src="cloud-b" top={skyPad + crown.h * s * 0.45} left="44vw" width="74vw" depth={0.25} opacity={0.9} />
+        <Cloud src="cloud-c" top={skyPad + crown.h * s * 1.25} left="-30vw" width="72vw" depth={0.18} opacity={0.85} />
+        <Cloud src="cloud-a" top={skyPad + crown.h * s * 2.3} left="50vw" width="64vw" depth={0.12} opacity={0.6} />
       </div>
 
       <div className="relative mx-auto" style={{ width: viewW, overflowX: "clip" }}>
@@ -163,23 +200,33 @@ export function Monument({
             ref={(el) => {
               rows.current[0] = el as HTMLDivElement;
             }}
-            className="mon-row relative"
-            style={{ height: Math.floor(crown.h * s) }}
+            className="mon-row relative z-[2]"
+            data-base={Math.floor(crown.h * s)}
+            style={{ height: Math.floor(crown.h * s) + (extra[0] ?? 0) }}
           >
+            {!!extra[0] && <Filler src={ASSET("crown")} w={crown.w * s} h={crown.h * s} top={Math.floor(crown.h * s)} extra={extra[0]} k={0.3 * m} left={-cropX} />}
             <div className="absolute top-0" style={{ left: -cropX, width: crown.w * s, height: crown.h * s }}>
               <Cover song={top} rect={crown.cover!} place={place} onOpen={setOpen} big />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={ASSET("crown")} alt="" className="mon-piece" style={{ width: crown.w * s }} fetchPriority="high" />
-              {crown.abacus && (
-                <div className="mon-carved mon-roman" style={place(crown.abacus, { fontSize: px(crown.abacus[3] * 0.62) })}>
-                  {person.name}
-                </div>
-              )}
-              {crown.band && (
-                <button type="button" onClick={() => setOpen(top)} className="mon-carved mon-band" style={place(crown.band)}>
-                  <span className="mon-title" style={{ fontSize: px(crown.band[3] * 0.34) }}>{carvedTitle(top.name)}</span>
-                  <span className="mon-artist" style={{ fontSize: px(crown.band[3] * 0.2) }}>{top.artists}</span>
-                </button>
+              {crown.column && (
+                <Nameplate
+                  ref={(el) => {
+                    plates.current[0] = el;
+                  }}
+                  song={top}
+                  onOpen={setOpen}
+                  m={m}
+                  tier="gold"
+                  style={{
+                    left: (crown.w / 2) * s,
+                    top: crown.column[1] * s - 1,
+                    transform: "translateX(-50%)",
+                    minWidth: 1.15 * m,
+                    maxWidth: Math.min(1.75 * m, viewW - 24),
+                  }}
+                  big
+                />
               )}
             </div>
           </section>
@@ -189,6 +236,17 @@ export function Monument({
           const name = slices[i];
           const piece = PIECES[name];
           if (!piece) return null;
+          const ov = piece.ov ?? 0;
+          const right = name.includes("-R-");
+          const tier = name.split("-")[1];
+          // the plate hangs flush against the column under the capital and grows outward
+          const inner = (piece.w / 2) * s + (right ? 1 : -1) * 0.44 * m;
+          const plate: React.CSSProperties = {
+            top: (piece.plaque ? piece.plaque[1] - ov : 0) * s - 1,
+            minWidth: 1.06 * m,
+            maxWidth: 1.46 * m,
+            ...(right ? { left: inner } : { right: piece.w * s - inner }),
+          };
           return (
             <section
               key={song.id}
@@ -196,57 +254,52 @@ export function Monument({
                 rows.current[i + 1] = el as HTMLDivElement;
               }}
               className="mon-row relative"
-              style={{ height: Math.floor(piece.h * s) }}
+              data-base={Math.floor((piece.h - ov) * s)}
+              style={{ height: Math.floor((piece.h - ov) * s) + (extra[i + 1] ?? 0) }}
             >
-              <div className="absolute top-0" style={{ left: -cropX, width: piece.w * s, height: piece.h * s }}>
-                <Cover song={song} rect={piece.cover!} place={place} onOpen={setOpen} />
+              {!!extra[i + 1] && (
+                <Filler src={ASSET(name)} w={piece.w * s} h={piece.h * s} top={Math.floor((piece.h - ov) * s)} extra={extra[i + 1]} k={0.3 * m} left={-cropX} />
+              )}
+              <div className="absolute top-0" style={{ left: -cropX, width: piece.w * s, height: (piece.h - ov) * s }}>
+                <Cover song={song} rect={[piece.cover![0], piece.cover![1] - ov, piece.cover![2], piece.cover![3]]} place={place} onOpen={setOpen} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={ASSET(name)} alt="" className="mon-piece" style={{ width: piece.w * s }} loading={i < 3 ? "eager" : "lazy"} />
-                {piece.tablet && (
-                  <button
-                    type="button"
-                    onClick={() => setOpen(song)}
-                    className="mon-carved mon-tablet"
-                    style={place(piece.tablet)}
-                    aria-label={`#${song.rank} ${song.name} by ${song.artists}`}
-                  >
-                    <span className="mon-numeral" style={{ fontSize: px(piece.tablet[3] * 0.5) }}>
-                      {roman(song.rank)}
-                    </span>
-                    <span className="mon-lines">
-                      <span className="mon-title" style={{ fontSize: px(piece.tablet[3] * 0.3) }}>{carvedTitle(song.name)}</span>
-                      <span className="mon-artist" style={{ fontSize: px(piece.tablet[3] * 0.19) }}>{song.artists}</span>
-                    </span>
-                  </button>
-                )}
+                <img
+                  src={ASSET(name)}
+                  alt=""
+                  className="mon-piece"
+                  style={{ width: piece.w * s, ...fadeTop(ov) }}
+                  loading={i < 3 ? "eager" : "lazy"}
+                />
+                <Nameplate
+                  ref={(el) => {
+                    plates.current[i + 1] = el;
+                  }}
+                  song={song}
+                  onOpen={setOpen}
+                  m={m}
+                  tier={tier}
+                  style={plate}
+                />
               </div>
             </section>
           );
         })}
 
         {baseP && (
-          <section className="relative z-[3]" style={{ height: Math.floor(baseP.h * s) }}>
-            <div className="absolute top-0" style={{ left: -cropX, width: baseP.w * s, height: baseP.h * s }}>
+          <section className="relative" style={{ height: Math.floor((baseP.h - (baseP.ov ?? 0)) * s) }}>
+            <div className="absolute top-0" style={{ left: -cropX, width: baseP.w * s, height: (baseP.h - (baseP.ov ?? 0)) * s }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ASSET(base)} alt="" className="mon-piece" style={{ width: baseP.w * s }} loading="lazy" />
-              {baseP.plinth && (
-                <div className="mon-carved mon-roman" style={place(baseP.plinth, { fontSize: px(baseP.plinth[3] * 0.32) })}>
-                  {person.name}
-                </div>
-              )}
+              <img
+                src={ASSET(base)}
+                alt=""
+                className="mon-piece mon-base"
+                style={{ width: baseP.w * s, marginTop: -(baseP.ov ?? 0) * s, ...baseMask(baseP.ov ?? 0, baseP.ground ?? baseP.h, s, m) }}
+                loading="lazy"
+              />
             </div>
           </section>
         )}
-      </div>
-      <div
-        className="mon-ground"
-        style={{
-          marginTop: -Math.round(0.07 * PX_PER_M * s),
-          ["--colx" as string]: mobile ? `${-MOBILE_X0_M * PX_PER_M * s}px` : "50%",
-          ["--colw" as string]: `${1.6 * PX_PER_M * s}px`,
-        }}
-      >
-        <div className="relative z-10 pt-[14vh] pb-12 text-center">
+        <div className="relative z-10 pt-6 pb-16 text-center">
           <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="mon-btn">
             Back up to #1
           </button>
@@ -258,8 +311,91 @@ export function Monument({
         </div>
       </div>
 
+      {/* one finishing pass over everything, so renders and photographs read as one picture */}
+      <div className="mon-finish" aria-hidden>
+        <div className="mon-rays" />
+        <div className="mon-grade" />
+        <div className="mon-grain" />
+      </div>
+
       {open && <Plaque song={open} onClose={() => setOpen(null)} isMe={isMe} storyHref={storyHref} />}
     </div>
+  );
+}
+
+/**
+ * The base sits in a small island of rendered grass that melts into the garden photo:
+ * the column and plinth stay solid, the lawn fades out around them, the top fades in
+ * over the slice above.
+ */
+function baseMask(ov: number, ground: number, s: number, m: number): React.CSSProperties {
+  const g = ground * s;
+  const top = `linear-gradient(to bottom, transparent 0, #000 ${ov * s}px, #000 ${g - 0.85 * m}px, transparent ${g - 0.6 * m}px)`;
+  const column = `linear-gradient(to right, transparent calc(50% - ${0.735 * m}px), #000 calc(50% - ${0.715 * m}px), #000 calc(50% + ${0.715 * m}px), transparent calc(50% + ${0.735 * m}px))`;
+  const island = `radial-gradient(${1.35 * m}px ${0.42 * m}px at 50% ${g - 0.06 * m}px, #000 30%, rgba(0,0,0,0.6) 60%, transparent 100%)`;
+  const image = `${top}, ${column}, ${island}`;
+  const size = `100% 100%, 100% ${g + 0.02 * m}px, 100% 100%`;
+  return {
+    WebkitMaskImage: image,
+    maskImage: image,
+    WebkitMaskSize: size,
+    maskSize: size,
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+  };
+}
+
+/** Plain shaft that stretches a row: the bottom strip of the same piece, drawn taller. */
+function Filler({ src, w, h, top, extra, k, left }: { src: string; w: number; h: number; top: number; extra: number; k: number; left: number }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute" style={{ top, left, width: w, height: extra + 2, overflow: "hidden", zIndex: 1 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="absolute bottom-0 left-0 max-w-none"
+        style={{ width: w, height: h, transform: `scaleY(${(extra + 2) / k})`, transformOrigin: "50% 100%", clipPath: `inset(${h - k}px 0 0 0)` }}
+      />
+    </div>
+  );
+}
+
+/** The marble nameplate under each ledge. It grows to fit: titles wrap, nothing is cut. */
+function Nameplate({
+  ref,
+  song,
+  onOpen,
+  m,
+  tier,
+  style,
+  big = false,
+}: {
+  song: MonumentSong;
+  onOpen: (s: MonumentSong) => void;
+  m: number;
+  tier: string;
+  style: React.CSSProperties;
+  big?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
+  const k = big ? 1.35 : 1;
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={() => onOpen(song)}
+      className={`mon-tag mon-tag-${tier}`}
+      style={{ ...style, ["--fs" as string]: `${Math.max(big ? 15 : 13, 0.066 * m * k)}px` }}
+      aria-label={`#${song.rank} ${song.name} by ${song.artists}`}
+    >
+      <span className="mon-numeral" style={{ fontSize: Math.max(10, 0.044 * m * k) }}>
+        {roman(song.rank)}
+      </span>
+      <span className="mon-title">{carvedTitle(song.name)}</span>
+      <span className="mon-artist" style={{ fontSize: Math.max(9.5, 0.036 * m * k) }}>
+        {song.artists}
+      </span>
+    </button>
   );
 }
 

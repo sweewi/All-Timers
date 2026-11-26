@@ -58,7 +58,7 @@ export default async function Home() {
           <Link
             key={member.id}
             href={`/u/${member.handle}`}
-            className="group rounded-2xl border border-line bg-surface p-5 transition hover:border-foreground/30"
+            className="group min-w-0 rounded-2xl border border-line bg-surface p-5 transition hover:border-foreground/30"
           >
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ background: member.color }} />

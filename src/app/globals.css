@@ -1,13 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0d0c0b;
-  --surface: #171513;
-  --surface-2: #211e1b;
-  --line: #2e2a26;
-  --foreground: #f2ede6;
-  --muted: #9a9187;
-  --accent: #ff7a3d;
+  /* a marble gallery in daylight: ivory stone, ink, antique gold */
+  --background: #f3eee3;
+  --surface: #fbf8f1;
+  --surface-2: #efe8da;
+  --line: #ddd0b4;
+  --foreground: #2c251b;
+  --muted: #776a55;
+  --accent: #a67c2e;
+  --gold-hi: #f1d892;
+  --gold: #b8913f;
+  --gold-lo: #7d5d22;
 }
 
 @theme inline {
@@ -18,25 +22,99 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-display);
+  --font-display: var(--font-garamond);
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
 }
+
+html { font-size: 106.25%; }
 
 body {
   background: var(--background);
   color: var(--foreground);
 }
+/* daylight sky high above, fading into stone: the same world as the column */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(180deg, rgba(243, 238, 227, 0.35) 0%, rgba(243, 238, 227, 0.82) 38%, #f3eee3 72%),
+    radial-gradient(120% 70% at 10% -10%, rgba(255, 220, 160, 0.55), transparent 60%),
+    url(/monument/sky-high.webp) center top / cover no-repeat;
+}
 
 ::selection {
-  background: var(--accent);
-  color: #000;
+  background: var(--gold-hi);
+  color: #2c251b;
 }
 
 .rank-num {
-  font-family: var(--font-display), ui-serif, Georgia, serif;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-garamond), "EB Garamond", Georgia, serif;
+  font-weight: 600;
+  font-variant-numeric: oldstyle-nums tabular-nums;
+  letter-spacing: -0.005em;
 }
+h1.rank-num, h2.rank-num { font-weight: 600; }
+.font-roman, [data-site-header] nav { font-family: var(--font-roman), serif; }
+
+/* marble panels instead of flat cards */
+.bg-surface {
+  background-image: linear-gradient(rgba(252, 250, 245, 0.74), rgba(252, 250, 245, 0.74)), url(/monument/marble.webp);
+  background-size: auto, 720px auto;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(60, 44, 18, 0.06), 0 10px 28px -14px rgba(60, 44, 18, 0.22);
+}
+.bg-surface-2 {
+  background-image: linear-gradient(rgba(239, 232, 218, 0.8), rgba(239, 232, 218, 0.8)), url(/monument/marble-worn.webp);
+  background-size: auto, 600px auto;
+}
+/* gilded buttons */
+.bg-accent {
+  background-image: linear-gradient(180deg, #dcc078 0%, #b8913f 52%, #977229 100%);
+  color: #fffaf0;
+  text-shadow: 0 -1px 0 rgba(80, 55, 10, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 205, 0.8), inset 0 -1px 0 rgba(90, 62, 15, 0.4), 0 2px 6px -2px rgba(90, 62, 15, 0.45);
+}
+.bg-accent:hover { filter: brightness(1.05); }
+input, textarea, select {
+  background-color: rgba(255, 253, 248, 0.92);
+  color: var(--foreground);
+}
+input::placeholder, textarea::placeholder { color: #a39579; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* the site header: a gilded cornice line over ivory */
+[data-site-header] {
+  position: relative;
+  background: linear-gradient(rgba(251, 248, 241, 0.9), rgba(251, 248, 241, 0.72));
+  backdrop-filter: blur(8px);
+  border-bottom: 0 !important;
+}
+[data-site-header]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 3px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold) 50%, var(--gold-lo));
+  opacity: 0.55;
+}
+[data-site-header] nav { letter-spacing: 0.12em; text-transform: uppercase; font-size: 12px; white-space: nowrap; }
+@media (max-width: 520px) {
+  [data-site-header] nav { column-gap: 14px; font-size: 10.5px; letter-spacing: 0.08em; }
+  [data-site-header] .brand { font-size: 15px; letter-spacing: 0.12em; }
+}
+[data-site-header] .brand { font-size: 20px; letter-spacing: 0.2em; font-weight: 700; color: #3a3125; }
 
 /* ------------------------------------------------------------------ monument */
 .monument {
@@ -69,30 +147,14 @@ body {
     radial-gradient(120% 90% at 12% 0%, rgba(255, 214, 150, 0.85), rgba(255, 214, 150, 0) 60%),
     linear-gradient(180deg, rgba(255, 236, 205, 0.35), rgba(255, 236, 205, 0) 70%);
   mix-blend-mode: soft-light;
-  opacity: var(--warm);
+  opacity: 0.6;
 }
-.mon-rays {
-  position: absolute;
-  left: -30vmax;
-  top: -40vmax;
-  width: 120vmax;
-  height: 120vmax;
-  background: repeating-conic-gradient(from 100deg at 50% 50%,
-      rgba(255, 238, 200, 0.55) 0deg 2.2deg, rgba(255, 238, 200, 0) 2.2deg 7deg,
-      rgba(255, 238, 200, 0.3) 7deg 8.5deg, rgba(255, 238, 200, 0) 8.5deg 15deg);
-  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 75%);
-  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 75%);
-  filter: blur(14px);
-  mix-blend-mode: screen;
-  opacity: var(--rays);
-  animation: mon-rays 90s linear infinite;
-}
-@keyframes mon-rays { to { transform: rotate(14deg); } }
-
 .mon-clouds { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .mon-cloud {
   position: absolute;
   max-width: none;
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent);
   transform: translateY(calc(var(--sy) * var(--depth) * -1)) translateX(calc(var(--sy) * var(--depth) * 0.04));
   will-change: transform;
 }
@@ -147,20 +209,111 @@ body {
   justify-content: center;
   white-space: nowrap;
 }
-.mon-tablet {
+/* nameplates: polished marble, lit from the upper left like the column, carved letters */
+.mon-tag {
+  position: absolute;
+  z-index: 4;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6em;
-  padding: 0 0.4em;
-  text-align: left;
+  gap: 0.18em;
+  padding: 0.55em 0.9em 0.65em;
+  text-align: center;
   cursor: pointer;
-  overflow: hidden;
+  color: rgba(64, 53, 38, 0.95);
+  background:
+    radial-gradient(circle at 0.7em 0.7em, #c9a862 0 0.16em, #6e5420 0.2em, transparent 0.24em),
+    radial-gradient(circle at calc(100% - 0.7em) 0.7em, #c9a862 0 0.16em, #6e5420 0.2em, transparent 0.24em),
+    linear-gradient(170deg, rgba(255, 246, 226, 0.5), rgba(255, 255, 255, 0) 45%, rgba(90, 80, 60, 0.12)),
+    url(/monument/marble.webp) center / 520px auto,
+    #efe9dc;
+  border-radius: 2px;
+  box-shadow:
+    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset -1.5px -1.5px 0 rgba(110, 92, 62, 0.35),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.18),
+    2px 3px 3px rgba(48, 36, 18, 0.28),
+    8px 14px 22px rgba(48, 36, 18, 0.22);
+  font-size: var(--fs);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.mon-band { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; overflow: hidden; }
-.mon-numeral { font-family: var(--font-roman), serif; font-weight: 700; letter-spacing: 0.04em; line-height: 1; flex-shrink: 0; }
-.mon-lines { display: flex; min-width: 0; flex-direction: column; line-height: 1.12; }
-.mon-title { font-family: var(--font-garamond), serif; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.mon-artist { font-family: var(--font-roman), serif; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.mon-tag::before {
+  content: "";
+  position: absolute;
+  inset: 0.32em;
+  border: 1px solid rgba(120, 100, 66, 0.28);
+  box-shadow: 1px 1px 0 rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+.mon-tag:hover { box-shadow:
+    inset 1.5px 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset -1.5px -1.5px 0 rgba(110, 92, 62, 0.35),
+    2px 3px 3px rgba(48, 36, 18, 0.28),
+    10px 18px 28px rgba(48, 36, 18, 0.26); }
+.mon-tag:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
+.mon-tag-weathered, .mon-tag-worn {
+  background:
+    radial-gradient(circle at 0.7em 0.7em, #8f7a4c 0 0.16em, #4a3a1c 0.2em, transparent 0.24em),
+    radial-gradient(circle at calc(100% - 0.7em) 0.7em, #8f7a4c 0 0.16em, #4a3a1c 0.2em, transparent 0.24em),
+    radial-gradient(120% 90% at 80% 110%, rgba(96, 88, 58, 0.22), transparent 60%),
+    linear-gradient(170deg, rgba(255, 246, 226, 0.4), rgba(255, 255, 255, 0) 45%, rgba(90, 80, 60, 0.16)),
+    url(/monument/marble-worn.webp) center / 520px auto,
+    #e6dfcf;
+}
+.mon-tag-gold {
+  padding: 0.7em 1.2em 0.8em;
+  box-shadow:
+    inset 0 0 0 3px #b8913f,
+    inset 0 0 0 4px #f3dc9b,
+    inset 0 0 0 6px #8a6526,
+    inset 2px 2px 0 6px rgba(255, 255, 255, 0.5),
+    3px 4px 4px rgba(48, 36, 18, 0.3),
+    10px 18px 30px rgba(48, 36, 18, 0.25);
+}
+.mon-tag-gold::before { inset: 0.55em; border-color: rgba(150, 112, 40, 0.45); }
+.mon-tag .mon-numeral,
+.mon-tag .mon-title,
+.mon-tag .mon-artist {
+  position: relative;
+  text-shadow: 0 1px 0 rgba(255, 253, 246, 0.85), 0 -1px 0 rgba(40, 28, 10, 0.25);
+}
+.mon-numeral { font-family: var(--font-roman), serif; font-weight: 700; letter-spacing: 0.22em; line-height: 1; color: rgba(140, 108, 48, 0.95); }
+.mon-title { font-family: var(--font-garamond), serif; font-weight: 600; font-size: 1em; line-height: 1.08; overflow-wrap: anywhere; text-wrap: balance; }
+.mon-artist { font-family: var(--font-roman), serif; font-weight: 500; letter-spacing: 0.14em; line-height: 1.25; text-transform: uppercase; overflow-wrap: anywhere; text-wrap: balance; color: rgba(92, 78, 58, 0.95); }
+
+/* the finishing pass: sun shafts, one warm grade, a whisper of film grain */
+.mon-finish { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+.mon-rays {
+  position: absolute;
+  inset: -6% -6% -6% -6%;
+  background: url(/monument/rays.webp) left top / cover no-repeat;
+  mix-blend-mode: screen;
+  opacity: var(--rays);
+  transform-origin: 0 0;
+  animation: mon-rays 26s ease-in-out infinite alternate;
+}
+@media (max-width: 720px) {
+  .mon-rays { opacity: calc(var(--rays) * 0.6); background-size: 160vw auto; }
+}
+@keyframes mon-rays {
+  from { transform: rotate(-1.2deg) scale(1.02); filter: brightness(0.92); }
+  to { transform: rotate(1.4deg) scale(1.05); filter: brightness(1.08); }
+}
+.mon-grade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(130% 100% at 8% 0%, rgba(255, 214, 150, 0.32), rgba(255, 214, 150, 0) 55%),
+    radial-gradient(140% 120% at 50% 45%, rgba(0, 0, 0, 0) 55%, rgba(60, 44, 20, 0.28) 100%);
+  mix-blend-mode: soft-light;
+}
+.mon-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.2 -0.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 
 .mon-kicker { font-family: var(--font-roman), serif; letter-spacing: 0.4em; font-size: 12px; color: #6e5f45; text-transform: uppercase; }
 .mon-name { font-family: var(--font-roman), serif; font-weight: 700; font-size: clamp(40px, 7vw, 84px); letter-spacing: 0.08em; color: #3a3125; line-height: 1.05; text-shadow: 0 1px 0 rgba(255, 250, 238, 0.7); }
@@ -199,20 +352,3 @@ body:has(.monument) [data-site-header] {
 }
 body:has(.monument) [data-site-header] a { color: #3a3125; }
 body:has(.monument) main { max-width: none; padding: 0; }
-.mon-ground {
-  position: relative;
-  z-index: 5;
-  background: url(/monument/ground.webp) center top / cover no-repeat;
-  min-height: 34vh;
-}
-.mon-ground::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: calc(var(--colx) - var(--colw) / 2);
-  width: var(--colw);
-  height: 28px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(30, 24, 12, 0.45), rgba(30, 24, 12, 0));
-  transform: translateY(-6px);
-}

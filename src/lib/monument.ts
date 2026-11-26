@@ -7,11 +7,16 @@ import manifest from "./monument-manifest.json";
  * ivy, ending at the base in a garden.
  *
  * Pieces are pre-rendered (Blender) and stacked; `manifest` holds each piece's pixel
- * size and where the cover opening, inscription tablet and carved faces sit.
+ * size, where the cover opening sits and where each nameplate hangs.
  */
 
 export type Rect = [number, number, number, number]; // x, y, w, h in source pixels
-export type Piece = { w: number; h: number; cover?: Rect; tablet?: Rect; abacus?: Rect; band?: Rect; plinth?: Rect };
+/** `ov` is the strip rendered above a piece that fades over the one above it; `plaque` is
+ *  [x, y, width] of the capital's underside, where the song's nameplate hangs. */
+export type Piece = {
+  w: number; h: number; ov?: number; cover?: Rect; column?: Rect; plinth?: Rect;
+  plaque?: [number, number, number]; ground?: number;
+};
 export const PIECES = manifest as unknown as Record<string, Piece>;
 
 /** Meters-to-pixels used for the renders, and the column's horizontal extent. */
@@ -55,10 +60,10 @@ export function baseFor(lastSlice: string | null) {
   return lastSlice && lastSlice.endsWith("-full") ? "base" : "base-tips";
 }
 
-/** Shorter title for the carved tablet: drops "- 2011 Remaster" style suffixes (the plaque shows the full one). */
+/** Title for the nameplate: drops only reissue noise like "- 2011 Remaster"; everything else stays. */
 export function carvedTitle(t: string) {
   return t
-    .replace(/\s+-\s+.*\b(remaster(ed)?|version|mix|mono|stereo|edit|live|demo)\b.*$/i, "")
-    .replace(/\s*[([](\d{4}\s+)?(remaster(ed)?|.*version|mono|stereo)[^)\]]*[)\]]\s*$/i, "")
+    .replace(/\s+-\s+(\d{4}\s+)?(digital(ly)?\s+)?remaster(ed)?(\s+\d{4})?(\s+version)?\s*$/i, "")
+    .replace(/\s*[([](\d{4}\s+)?(digital(ly)?\s+)?remaster(ed)?(\s+\d{4})?(\s+version)?[)\]]\s*$/i, "")
     .trim() || t;
 }

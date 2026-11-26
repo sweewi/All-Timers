@@ -21,6 +21,14 @@ const garamond = localFont({
   ],
   variable: "--font-garamond",
 });
+const body = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/eb-garamond/files/eb-garamond-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/eb-garamond/files/eb-garamond-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/eb-garamond/files/eb-garamond-latin-400-italic.woff2", weight: "400", style: "italic" },
+  ],
+  variable: "--font-body",
+});
 const display = localFont({
   src: "../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2",
   variable: "--font-display",
@@ -37,11 +45,11 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} h-full antialiased`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} ${body.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <header data-site-header className="border-b border-line">
           <nav className="mx-auto flex max-w-5xl items-center gap-5 px-5 py-4 text-sm">
-            <Link href="/" className="rank-num text-2xl tracking-tight">
+            <Link href="/" className="brand">
               All-Timers
             </Link>
             {user && (

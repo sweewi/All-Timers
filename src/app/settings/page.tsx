@@ -71,8 +71,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   <a href="/api/spotify/login" className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent">
                     {spotifyConnected ? "Reconnect Spotify" : "Connect my Spotify"}
                   </a>
-                  {spotifyConnected && <span className="text-sm text-green-400">Connected</span>}
-                  {sp.spotify === "error" && <span className="text-sm text-red-400">That didn&apos;t work. Try again.</span>}
+                  {spotifyConnected && <span className="text-sm text-green-700">Connected</span>}
+                  {sp.spotify === "error" && <span className="text-sm text-red-700">That didn&apos;t work. Try again.</span>}
                 </div>
                 <div className="flex items-center gap-3 pt-2">
                   <ActionButton run={refreshSongDetails} label="Refresh song details" />
@@ -85,7 +85,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       )}
 
       <form action={signOut}>
-        <button className="text-sm text-muted hover:text-red-400">Sign out of this device</button>
+        <button className="text-sm text-muted hover:text-red-700">Sign out of this device</button>
       </form>
     </div>
   );

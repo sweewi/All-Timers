@@ -31,7 +31,8 @@ def box(name, center, size, mat=None, bevel=0.0):
     if bevel:
         m = o.modifiers.new("bev", "BEVEL")
         m.width = bevel
-        m.segments = 3
+        m.segments = 4
+        m.limit_method = "ANGLE"
     if mat:
         o.data.materials.append(mat)
     return o
@@ -97,15 +98,19 @@ def sphere(name, center, radius, scale=(1, 1, 1), mat=None):
     return o
 
 
-def ionic(cx, ztop, width, depth, rv, mat, eggs=7, abacus_h=None):
-    """An Ionic capital (abacus, canalis band, echinus with egg-and-dart, two volutes).
+def ionic(cx, ztop, width, depth, rv, mat, eggs=7, abacus_h=None, collar=None):
+    """An Ionic capital: abacus, canalis, a solid bolster between two volutes, and an
+    echinus with egg-and-dart. Built along X so the volutes face the camera.
 
-    Built along X so its volutes face the camera. ztop is the top of the abacus.
-    Returns the list of objects.
+    ztop is the top of the abacus. The body is closed underneath so no sky shows
+    through. With `collar` (a shaft radius) it also gets the round echinus and the
+    astragal bead that seat it on a shaft. Returns (objects, z of the underside).
     """
     objs = []
     ah = abacus_h or rv * 0.42
-    objs.append(box("abacus", (cx, 0, ztop - ah / 2), (width * 1.04, depth * 1.06, ah), mat, bevel=ah * 0.18))
+    objs.append(box("abacus", (cx, 0, ztop - ah / 2), (width * 1.04, depth * 1.06, ah), mat, bevel=ah * 0.22))
+    # a thin cyma under the abacus so its edge casts a soft line, not a slot
+    objs.append(box("cyma", (cx, 0, ztop - ah - rv * 0.06), (width * 0.97, depth * 1.0, rv * 0.14), mat, bevel=rv * 0.05))
     zc = ztop - ah - rv * 1.02          # volute center
     vx = width / 2 - rv
     front = -depth / 2
@@ -117,15 +122,42 @@ def ionic(cx, ztop, width, depth, rv, mat, eggs=7, abacus_h=None):
     # canalis: the band joining the tops of the volutes
     band_h = rv * 0.95
     objs.append(box("canalis", (cx, 0, zc + rv - band_h / 2 + 0.002), (2 * vx, depth * 0.98, band_h), mat, bevel=rv * 0.08))
-    # echinus with a row of eggs
-    er = rv * 0.5
-    elen = 2 * vx - rv * 1.1
-    objs.append(cyl_x("echinus", (cx, 0, zc - rv * 0.05), er, elen, mat))
-    for i in range(eggs):
-        ex = cx - elen / 2 + elen * (i + 0.5) / eggs
-        objs.append(sphere(f"egg{i}", (ex, -depth / 2 + er * 0.05 + (depth / 2 - er) - 0.0, zc - rv * 0.08),
-                           er * 0.42, (0.75, 0.6, 1.0), mat))
-    return objs
+    # bolster: fills the space between and behind the volutes down to their underside
+    zb = zc - rv * 0.9
+    body_d = depth * 0.92
+    objs.append(box("bolster", (cx, 0, (zb + zc + 0.1 * rv) / 2), (2 * vx + rv * 0.6, body_d, zc + 0.1 * rv - zb), mat,
+                    bevel=rv * 0.1))
+    if collar:
+        R = collar
+        # round echinus seated on the shaft, eggs around its front
+        bpy.ops.mesh.primitive_cone_add(vertices=128, radius1=R + 0.012, radius2=R + 0.085, depth=0.15,
+                                        location=(cx, 0, zb + 0.03))
+        e = bpy.context.active_object; e.name = "echinus"; C.shade_smooth(e); e.data.materials.append(mat)
+        bv = e.modifiers.new("bev", "BEVEL"); bv.width = 0.02; bv.segments = 4; bv.limit_method = "ANGLE"
+        objs.append(e)
+        n = eggs * 2
+        for i in range(n):
+            a = math.pi + (i + 0.5) / n * math.pi
+            rr = R + 0.06
+            objs.append(sphere(f"egg{i}", (cx + rr * math.cos(a), rr * math.sin(a), zb + 0.035), 0.04,
+                               (0.62, 0.5, 0.95), mat))
+        bpy.ops.mesh.primitive_torus_add(major_radius=R + 0.006, minor_radius=0.024, major_segments=128,
+                                         minor_segments=16, location=(cx, 0, zb - 0.07))
+        t = bpy.context.active_object; t.name = "astragal"; C.shade_smooth(t); t.data.materials.append(mat)
+        objs.append(t)
+        return objs, zb - 0.1
+    # ledge: egg-and-dart set into the bolster's front, a bead line beneath
+    fy = -body_d / 2
+    elen = 2 * vx - rv * 0.7
+    er = rv * 0.2
+    for i in range(eggs + 2):
+        ex = cx - elen / 2 + elen * (i + 0.5) / (eggs + 2)
+        objs.append(sphere(f"egg{i}", (ex, fy, zb + rv * 0.42), er, (0.8, 0.5, 1.15), mat))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=rv * 0.07, depth=elen + rv * 0.2,
+                                        location=(cx, fy + rv * 0.02, zb + rv * 0.13), rotation=(0, math.radians(90), 0))
+    bead = bpy.context.active_object; C.shade_smooth(bead); bead.data.materials.append(mat); objs.append(bead)
+    objs.append(box("fillet", (cx, 0, zb + rv * 0.03), (2 * vx + rv * 0.3, body_d * 0.98, rv * 0.06), mat, bevel=rv * 0.02))
+    return objs, zc - rv
 
 
 def tablet(cx, ztop, w, h, d, mat):

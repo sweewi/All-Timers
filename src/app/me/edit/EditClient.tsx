@@ -247,7 +247,7 @@ function SortableRow(props: {
             ) : (
               <span>Save the order first to move songs between lists</span>
             )}
-            <button type="button" onClick={props.onRemove} className="hover:text-red-400">
+            <button type="button" onClick={props.onRemove} className="hover:text-red-700">
               Remove from list
             </button>
           </div>
