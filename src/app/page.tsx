@@ -5,7 +5,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCrewFeed, getCrewOverview, type FeedItem } from "@/lib/lists";
 import { Art } from "@/components/track";
 import { CopyButton } from "@/components/client";
+import { ShareInvite } from "@/components/ShareInvite";
 import { setupCrew } from "./actions";
+import { after } from "next/server";
+import { backfillTracks } from "@/lib/spotify";
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -15,6 +18,7 @@ export default async function Home() {
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)))[0];
   const [overview, feed] = await Promise.all([getCrewOverview(user.crewId), getCrewFeed(user.crewId)]);
   const mine = overview.find((o) => o.member.id === user.id);
+  after(() => backfillTracks());
 
   return (
     <div className="space-y-12">
@@ -23,11 +27,21 @@ export default async function Home() {
           <p className="text-sm uppercase tracking-widest text-muted">{crew.name}</p>
           <h1 className="rank-num mt-1 text-5xl">Everyone&apos;s all-timers</h1>
         </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
-          <span className="text-sm text-muted">Invite your crew</span>
-          <CopyButton text={`/join/${crew.inviteCode}`} label="Copy invite link" />
-        </div>
+        {overview.length > 1 && <CopyButton text={`/join/${crew.inviteCode}`} label="Invite friends" />}
       </section>
+
+      {overview.length === 1 && (
+        <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
+          <h2 className="rank-num text-4xl">It&apos;s just you so far.</h2>
+          <p className="mt-2 max-w-xl text-muted">
+            This gets good when everyone&apos;s list is here. Send the group your invite link: they tap it, type their
+            name, paste their list, and they&apos;re in. Nobody needs an account or a password.
+          </p>
+          <div className="mt-5">
+            <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
+          </div>
+        </section>
+      )}
 
       {mine && mine.count === 0 && (
         <Link
@@ -152,27 +166,39 @@ function timeAgo(d: Date) {
 
 async function SignedOut() {
   const db = await getDb();
-  const anyCrew = (await db.select({ id: schema.crews.id }).from(schema.crews).limit(1)).length > 0;
+  const crew = (await db.select().from(schema.crews).limit(1))[0];
+  const admin = crew
+    ? (await db.select().from(schema.users).where(eq(schema.users.crewId, crew.id))).find((u) => u.isAdmin)
+    : null;
   return (
     <div className="mx-auto max-w-xl py-12">
-      <h1 className="rank-num text-6xl leading-none">Your crew&apos;s all-time favorite songs, ranked.</h1>
-      {anyCrew ? (
+      <h1 className="rank-num text-6xl leading-none">Everyone&apos;s all-time favorite songs, ranked.</h1>
+      {crew ? (
         <p className="mt-6 text-muted">
-          All-Timers is invite-only. Ask someone in your crew for the invite link. Already joined on another device?
-          Open Settings there and use &ldquo;Sign in on another device.&rdquo;
+          This is {crew.name}. To join, ask {admin?.name ?? "whoever runs it"} for the invite link. Already in on another
+          device? Open Settings there and tap &ldquo;Make a sign-in link.&rdquo;
         </p>
       ) : (
         <form action={setupCrew} className="mt-8 space-y-4 rounded-2xl border border-line bg-surface p-6">
-          <p className="text-sm text-muted">First time here. Set up your crew; you&apos;ll get an invite link to share.</p>
-          <label className="block">
-            <span className="text-sm">Crew name</span>
-            <input name="crewName" placeholder="The Crew" className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2" />
-          </label>
+          <div>
+            <h2 className="font-medium">Start your group</h2>
+            <p className="mt-1 text-sm text-muted">
+              You only do this once. You&apos;ll get one invite link; everyone you send it to joins this same group.
+            </p>
+          </div>
           <label className="block">
             <span className="text-sm">Your name</span>
             <input name="name" required className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2" />
           </label>
-          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">Create crew</button>
+          <label className="block">
+            <span className="text-sm">Group name (optional)</span>
+            <input
+              name="crewName"
+              placeholder="e.g. The Boys, Saturday Club"
+              className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2"
+            />
+          </label>
+          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">Start</button>
         </form>
       )}
     </div>

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getCrewMembers, getList } from "@/lib/lists";
 import { artistLine } from "@/lib/songs";
 import { EditClient, type EditItem } from "./EditClient";
+import { hasStory, toStoryValues } from "@/lib/story-values";
 
 export default async function EditPage({ searchParams }: PageProps<"/me/edit">) {
   const user = await requireUser();
@@ -23,16 +24,8 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
     artists: artistLine(e.track.artists),
     version: [e.track.album, e.track.releaseYear].filter(Boolean).join(" · "),
     imageUrl: e.track.imageUrl,
-    origin: e.origin
-      ? {
-          id: e.origin.id,
-          fromUserId: e.origin.fromUserId,
-          fromName: e.origin.fromName,
-          whenText: e.origin.whenText ?? "",
-          whereText: e.origin.whereText ?? "",
-          story: e.origin.story ?? "",
-        }
-      : null,
+    story: toStoryValues(e.origin),
+    hasStory: hasStory(e.origin),
   }));
 
   return (
@@ -44,7 +37,7 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
           </Link>
           <h1 className="rank-num mt-1 text-5xl">Edit {kind === "on_deck" ? "On Deck" : "All-Time"}</h1>
           <p className="mt-2 text-sm text-muted">
-            Drag to reorder. Add a story to any song: where you were, when it hit, who put you on.
+            Drag to reorder, or type a new rank number. Open a song to say why it&apos;s here.
           </p>
         </div>
         <div className="flex gap-2 text-sm">
@@ -65,7 +58,7 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
       <EditClient
         kind={kind}
         initial={items}
-        members={members.filter((m) => m.id !== user.id).map((m) => ({ id: m.id, name: m.name }))}
+        members={members.filter((m) => m.id !== user.id).map((m) => ({ id: m.id, name: m.name, color: m.color }))}
         inviteCode={crew[0].inviteCode}
       />
     </div>

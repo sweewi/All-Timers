@@ -23,7 +23,8 @@ export async function setupCrew(formData: FormData) {
   const db = await getDb();
   const existing = await db.select({ id: schema.crews.id }).from(schema.crews).limit(1);
   if (existing.length) redirect("/");
-  const crewName = String(formData.get("crewName") || "").trim() || "The Crew";
+  const name0 = String(formData.get("name") || "").trim();
+  const crewName = String(formData.get("crewName") || "").trim() || (name0 ? `${name0}'s All-Timers` : "All-Timers");
   const name = String(formData.get("name") || "").trim();
   if (!name) redirect("/?error=name");
   const crewId = newId();
@@ -70,7 +71,7 @@ export async function joinCrew(formData: FormData) {
       if (owner?.crewId === crew.id) {
         await db
           .update(schema.origins)
-          .set({ fromUserId: userId, fromName: null, updatedAt: new Date() })
+          .set({ fromUserId: userId, fromName: null, foundVia: "friend", updatedAt: new Date() })
           .where(eq(schema.origins.id, origin.id));
       }
     }

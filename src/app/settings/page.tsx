@@ -3,7 +3,7 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getCrewMembers } from "@/lib/lists";
 import { signOut } from "@/app/actions";
-import { CopyButton } from "@/components/client";
+import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
 import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails } from "./actions";
 import { ActionButton } from "./ActionButton";
@@ -33,7 +33,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
       <section className="space-y-3">
         <h2 className="font-medium">Invite people to {crew.name}</h2>
-        <CopyButton text={`/join/${crew.inviteCode}`} label="Copy invite link" />
+        <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
       </section>
 
       {user.isAdmin && (

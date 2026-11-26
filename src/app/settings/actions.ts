@@ -27,7 +27,7 @@ export async function refreshSongDetails() {
   const db = await getDb();
   const partial = await db.select({ id: schema.tracks.id }).from(schema.tracks).where(ne(schema.tracks.metaSource, "spotify"));
   const ids = partial.map((t) => t.id);
-  const after = await resolveTracks(ids);
-  const fixed = after.filter((t) => t.metaSource === "spotify").length;
+  const after = await resolveTracks(ids, { upgrade: true });
+  const fixed = after.filter((t) => t.metaSource === "spotify" || t.metaSource === "page").length;
   return `${fixed} of ${ids.length} songs updated`;
 }

@@ -5,6 +5,9 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getList } from "@/lib/lists";
 import { Art, RankedRow } from "@/components/track";
+import { hasStory } from "@/lib/story-values";
+import { backfillTracks } from "@/lib/spotify";
+import { after } from "next/server";
 
 export default async function ProfilePage({ params, searchParams }: PageProps<"/u/[handle]">) {
   const viewer = await requireUser();
@@ -19,7 +22,9 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
   const [allTime, onDeck] = await Promise.all([getList(person.id, "all_time"), getList(person.id, "on_deck")]);
   const entries = kind === "on_deck" ? onDeck : allTime;
   const putOns = allTime.filter((e) => e.origin?.fromUser).length;
-  const withStory = allTime.filter((e) => e.origin).length;
+  const withStory = allTime.filter((e) => hasStory(e.origin)).length;
+  const untold = entries.filter((e) => !hasStory(e.origin)).length;
+  after(() => backfillTracks());
 
   return (
     <div>
@@ -32,14 +37,14 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
           </div>
           <h1 className="rank-num mt-1 text-6xl leading-none">{person.name}</h1>
           <p className="mt-3 text-sm text-muted">
-            {allTime.length} all-timers · {onDeck.length} on deck · {putOns} put on by friends · {withStory} with a story
+            {allTime.length} all-timers · {onDeck.length} on deck · {putOns} put on by friends · {withStory} with a why
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {isMe ? (
             <>
-              <Link href={`/me/edit?list=${kind}`} className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black">
-                Edit &amp; add stories
+              <Link href={`/me/edit?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
+                Reorder
               </Link>
               <Link href={`/me/import?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
                 Import from Spotify
@@ -52,6 +57,21 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
           )}
         </div>
       </section>
+
+      {isMe && entries.length > 0 && untold > 0 && (
+        <Link
+          href={`/me/stories?list=${kind}`}
+          className="mt-8 flex items-center justify-between gap-4 rounded-2xl border border-accent/40 bg-accent/10 px-5 py-4 hover:bg-accent/15"
+        >
+          <div>
+            <div className="font-medium text-accent">Say why they&apos;re here</div>
+            <div className="text-sm text-muted">
+              {untold} {untold === 1 ? "song doesn't" : "songs don't"} have a why yet. Go one at a time, skip any you want.
+            </div>
+          </div>
+          <span className="text-accent">→</span>
+        </Link>
+      )}
 
       <div className="mt-10 flex gap-6 border-b border-line text-sm">
         <Tab href={`/u/${handle}`} active={kind === "all_time"} label={`All-Time (${allTime.length})`} />
@@ -74,7 +94,11 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       ) : (
         <ol>
           {entries.map((e) => (
-            <RankedRow key={e.track.id} entry={e} />
+            <RankedRow
+              key={e.track.id}
+              entry={e}
+              storyHref={isMe ? `/me/stories?list=${kind}&track=${e.track.id}` : undefined}
+            />
           ))}
         </ol>
       )}

@@ -14,8 +14,8 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { ListKind } from "@/db/schema";
-import { CopyButton } from "@/components/client";
-import { moveToList, saveOrder, saveOrigin } from "./actions";
+import { StoryForm, type StoryValues } from "@/components/StoryForm";
+import { moveToList, saveOrder } from "./actions";
 
 export type EditItem = {
   id: string;
@@ -23,17 +23,11 @@ export type EditItem = {
   artists: string;
   version: string;
   imageUrl: string | null;
-  origin: {
-    id: string;
-    fromUserId: string | null;
-    fromName: string | null;
-    whenText: string;
-    whereText: string;
-    story: string;
-  } | null;
+  story: StoryValues;
+  hasStory: boolean;
 };
 
-type Member = { id: string; name: string };
+type Member = { id: string; name: string; color: string };
 
 export function EditClient({
   kind,
@@ -184,9 +178,7 @@ function SortableRow(props: {
 }) {
   const { item, rank } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
-  const hasStory = Boolean(
-    item.origin && (item.origin.fromUserId || item.origin.fromName || item.origin.story || item.origin.whenText || item.origin.whereText),
-  );
+  const hasStory = item.hasStory;
 
   return (
     <li
@@ -235,12 +227,18 @@ function SortableRow(props: {
           onClick={props.onToggle}
           className={`rounded-full border px-3 py-1 text-xs ${hasStory ? "border-accent/60 text-accent" : "border-line text-muted"}`}
         >
-          {hasStory ? "Story ✓" : "+ Story"}
+          {hasStory ? "Why ✓" : "+ Why it's here"}
         </button>
       </div>
       {props.open && (
         <div className="mb-4 ml-8 rounded-2xl border border-line bg-surface p-4">
-          <OriginForm item={item} members={props.members} inviteCode={props.inviteCode} />
+          <StoryForm
+            trackId={item.id}
+            trackName={item.name}
+            initial={item.story}
+            members={props.members}
+            inviteCode={props.inviteCode}
+          />
           <div className="mt-4 flex gap-4 border-t border-line pt-3 text-xs text-muted">
             {props.onSwitchList ? (
               <button type="button" onClick={props.onSwitchList} className="hover:text-foreground">
@@ -256,93 +254,5 @@ function SortableRow(props: {
         </div>
       )}
     </li>
-  );
-}
-
-function OriginForm({ item, members, inviteCode }: { item: EditItem; members: Member[]; inviteCode: string }) {
-  const o = item.origin;
-  const [who, setWho] = useState(o?.fromUserId ?? (o?.fromName ? "__other" : ""));
-  const [fromName, setFromName] = useState(o?.fromName ?? "");
-  const [whenText, setWhen] = useState(o?.whenText ?? "");
-  const [whereText, setWhere] = useState(o?.whereText ?? "");
-  const [story, setStory] = useState(o?.story ?? "");
-  const [saved, setSaved] = useState<{ originId: string; inviteName: string | null } | null>(null);
-  const [pending, start] = useTransition();
-
-  const submit = () =>
-    start(async () => {
-      const res = await saveOrigin({
-        trackId: item.id,
-        fromUserId: who && who !== "__other" ? who : null,
-        fromName: who === "__other" ? fromName : null,
-        whenText,
-        whereText,
-        story,
-      });
-      setSaved(res);
-    });
-
-  const field = "mt-1 w-full rounded-lg border border-line bg-background px-3 py-2 text-sm";
-  return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block text-sm">
-          Who put you on?
-          <select value={who} onChange={(e) => setWho(e.target.value)} className={field}>
-            <option value="">Found it myself / not sure</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-            <option value="__other">Someone not in the app…</option>
-          </select>
-        </label>
-        <label className="block text-sm">
-          When
-          <input value={whenText} onChange={(e) => setWhen(e.target.value)} placeholder="Summer 2019" className={field} />
-        </label>
-        <label className="block text-sm">
-          Where
-          <input value={whereText} onChange={(e) => setWhere(e.target.value)} placeholder="Road trip to Maine" className={field} />
-        </label>
-      </div>
-      {who === "__other" && (
-        <label className="block text-sm">
-          Their name
-          <input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="My brother" className={field} />
-        </label>
-      )}
-      <label className="block text-sm">
-        The story
-        <textarea
-          value={story}
-          onChange={(e) => setStory(e.target.value)}
-          rows={2}
-          placeholder="Why this one stuck with you"
-          className={field}
-        />
-      </label>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={pending}
-          className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-black disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Save story"}
-        </button>
-        {saved && !saved.inviteName && <span className="text-sm text-muted">Saved</span>}
-      </div>
-      {saved?.inviteName && (
-        <div className="rounded-xl border border-accent/50 bg-accent/10 p-3 text-sm">
-          <b>{saved.inviteName}</b> isn&apos;t in the app yet. Send them this link; when they join, they get credit for putting
-          you on.
-          <div className="mt-2">
-            <CopyButton text={`/join/${inviteCode}?from=${saved.originId}`} label="Copy invite link" />
-          </div>
-        </div>
-      )}
-    </div>
   );
 }

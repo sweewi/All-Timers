@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { getDb, schema } from "@/db";
-import type { ListKind } from "@/db/schema";
+import { FOUND_VIA, type FoundVia, type ListKind } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId } from "@/lib/ids";
@@ -30,33 +30,39 @@ export async function moveToList(trackId: string, from: ListKind, to: ListKind) 
 
 export type OriginInput = {
   trackId: string;
+  foundVia: FoundVia | null;
   fromUserId: string | null;
   fromName: string | null;
+  love: string;
+  moment: string;
   whenText: string;
-  whereText: string;
   story: string;
 };
 
 /**
- * Save where a song came from. Picking a crew member makes it a put-on.
- * Naming someone who isn't in the app returns an origin id for an invite link
- * that credits them when they join.
+ * Save the story behind a song. "A friend put me on" + a crew member makes it a
+ * put-on. Naming someone who isn't in the app returns an origin id for an invite
+ * link that credits them when they join.
  */
 export async function saveOrigin(input: OriginInput) {
   const user = await requireUser();
   const db = await getDb();
-  let fromUserId = input.fromUserId || null;
+  const foundVia = input.foundVia && FOUND_VIA.includes(input.foundVia) ? input.foundVia : null;
+  let fromUserId = foundVia === "friend" ? input.fromUserId || null : null;
   if (fromUserId) {
     const giver = (await db.select().from(schema.users).where(eq(schema.users.id, fromUserId)))[0];
     if (!giver || giver.crewId !== user.crewId || giver.id === user.id) fromUserId = null;
   }
-  const fromName = fromUserId ? null : input.fromName?.trim() || null;
+  const fromName = foundVia === "someone" ? input.fromName?.trim() || null : null;
+  const clean = (s: string) => s.trim().slice(0, 2000) || null;
   const values = {
+    foundVia,
     fromUserId,
     fromName,
-    whenText: input.whenText.trim() || null,
-    whereText: input.whereText.trim() || null,
-    story: input.story.trim() || null,
+    love: clean(input.love),
+    moment: clean(input.moment),
+    whenText: clean(input.whenText),
+    story: clean(input.story),
     updatedAt: new Date(),
   };
   const existing = (

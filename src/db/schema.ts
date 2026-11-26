@@ -67,7 +67,8 @@ export const tracks = pgTable(
     durationMs: integer("duration_ms"),
     isrc: text("isrc"),
     songKey: text("song_key").notNull(), // normalized title + primary artist
-    metaSource: text("meta_source").notNull(), // spotify | oembed | none
+    color: text("color"), // Spotify's background color for this song's art, "#rrggbb"
+    metaSource: text("meta_source").notNull(), // spotify (API) | page (public pages) | oembed | none
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("tracks_isrc_idx").on(t.isrc), index("tracks_song_key_idx").on(t.songKey)],
@@ -96,6 +97,9 @@ export const listEntries = pgTable(
   ],
 );
 
+export const FOUND_VIA = ["friend", "someone", "grew_up", "myself", "live", "screen", "playlist"] as const;
+export type FoundVia = (typeof FOUND_VIA)[number];
+
 /**
  * Where a song came from for one person. It belongs to the person and the song,
  * not the list, so it survives moving a song from On Deck to All-Time.
@@ -113,9 +117,12 @@ export const origins = pgTable(
       .references(() => tracks.id),
     fromUserId: text("from_user_id").references(() => users.id, { onDelete: "set null" }),
     fromName: text("from_name"), // someone outside the app ("my dad")
+    foundVia: text("found_via").$type<FoundVia>(), // how the song found them
+    love: text("love"), // what they love about it: the heart of the story
+    moment: text("moment"), // favorite moment, e.g. "the drop at 2:41"
     whenText: text("when_text"),
     whereText: text("where_text"),
-    story: text("story"),
+    story: text("story"), // the memory tied to it
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
