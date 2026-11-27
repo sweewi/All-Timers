@@ -80,6 +80,23 @@ export async function createLoginLink(userId: string) {
   return `/signin/${token}`;
 }
 
+/**
+ * Who a sign-in link is for, without using it up. Opening a link only shows this;
+ * the link is spent when the person taps "Sign in" (a POST), so link previews in
+ * Messages, Slack, email scanners and the like can't burn it first.
+ */
+export async function peekLoginLink(token: string) {
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) return null;
+  const db = await getDb();
+  const rows = await db
+    .select({ name: schema.users.name, color: schema.users.color, expiresAt: schema.loginLinks.expiresAt })
+    .from(schema.loginLinks)
+    .innerJoin(schema.users, eq(schema.users.id, schema.loginLinks.userId))
+    .where(and(eq(schema.loginLinks.tokenHash, hashToken(token)), gt(schema.loginLinks.expiresAt, new Date())))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function redeemLoginLink(token: string) {
   const db = await getDb();
   const hash = hashToken(token);

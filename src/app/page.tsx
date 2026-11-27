@@ -350,7 +350,7 @@ async function SignedOut() {
       {crew ? (
         <p className="paper-note mt-6">
           This is {crew.name}. To join, ask {admin?.name ?? "whoever runs it"} for the invite link. Already in on another
-          device? Open Settings there and tap &ldquo;Make a sign-in link.&rdquo;
+          device? Open Settings there and tap &ldquo;Make a link for my other device.&rdquo;
         </p>
       ) : (
         <form action={setupCrew} className="mt-8 space-y-4 rounded-2xl border border-line bg-surface p-6">
