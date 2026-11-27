@@ -309,7 +309,7 @@ export async function backfillTracks(limit = 40) {
   const partial = await db
     .select({ id: schema.tracks.id })
     .from(schema.tracks)
-    .where(notInArray(schema.tracks.metaSource, ["spotify", "page"]))
+    .where(notInArray(schema.tracks.metaSource, ["spotify", "page", "statsfm"]))
     .limit(limit);
   if (partial.length) await resolveTracks(partial.map((t) => t.id));
   return partial.length;

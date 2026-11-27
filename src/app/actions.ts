@@ -8,6 +8,7 @@ import { startSession, endSession, requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId, newToken, pickColor, slugify } from "@/lib/ids";
 import { REACTIONS, type ReactionKind } from "@/db/schema";
+import { budget, clientAddress, parse, zId, zTrackId } from "@/lib/guard";
 
 async function uniqueHandle(name: string) {
   const db = await getDb();
@@ -26,9 +27,9 @@ export async function setupCrew(formData: FormData) {
   const db = await getDb();
   const existing = await db.select({ id: schema.crews.id }).from(schema.crews).limit(1);
   if (existing.length) redirect("/");
-  const name0 = String(formData.get("name") || "").trim();
-  const crewName = String(formData.get("crewName") || "").trim() || (name0 ? `${name0}'s All-Timers` : "All-Timers");
-  const name = String(formData.get("name") || "").trim();
+  await budget("join", await clientAddress());
+  const name = String(formData.get("name") || "").trim().slice(0, 40);
+  const crewName = String(formData.get("crewName") || "").trim().slice(0, 60) || (name ? `${name}'s All-Timers` : "All-Timers");
   if (!name) redirect("/?error=name");
   const crewId = newId();
   await db.insert(schema.crews).values({ id: crewId, name: crewName, inviteCode: newToken(9) });
@@ -51,9 +52,11 @@ export async function setupCrew(formData: FormData) {
  */
 export async function joinCrew(formData: FormData) {
   const db = await getDb();
-  const code = String(formData.get("code") || "");
-  const name = String(formData.get("name") || "").trim();
-  const fromOrigin = String(formData.get("fromOrigin") || "");
+  await budget("join", await clientAddress());
+  const code = String(formData.get("code") || "").slice(0, 64);
+  const name = String(formData.get("name") || "").trim().slice(0, 40);
+  const fromOriginRaw = String(formData.get("fromOrigin") || "");
+  const fromOrigin = zId.safeParse(fromOriginRaw).success ? fromOriginRaw : "";
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.inviteCode, code)))[0];
   if (!crew) redirect("/");
   if (!name) redirect(`/join/${code}?error=name`);
@@ -92,8 +95,11 @@ export async function signOut() {
  * "Steal it": put a friend's song on your On Deck, credited to them as a put-on.
  * Never touches your All-Time order; you decide if it climbs in.
  */
-export async function stealSong(trackId: string, fromUserId: string) {
+export async function stealSong(trackIdIn: string, fromUserIdIn: string) {
   const user = await requireUser();
+  const trackId = parse(zTrackId, trackIdIn);
+  const fromUserId = parse(zId, fromUserIdIn);
+  await budget("write", user.id);
   const db = await getDb();
   const giver = (await db.select().from(schema.users).where(eq(schema.users.id, fromUserId)))[0];
   if (!giver || giver.crewId !== user.crewId || giver.id === user.id) return { ok: false as const };
@@ -114,6 +120,7 @@ export async function stealSong(trackId: string, fromUserId: string) {
 /** Toggle one reaction (laurel, fire, cry, same) on a song or a batch of moves. */
 export async function toggleReaction(target: string, kind: string) {
   const user = await requireUser();
+  await budget("write", user.id);
   if (!/^(song|moves):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
   const db = await getDb();
   const mine = and(

@@ -1,9 +1,11 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -68,7 +70,7 @@ export const tracks = pgTable(
     isrc: text("isrc"),
     songKey: text("song_key").notNull(), // normalized title + primary artist
     color: text("color"), // Spotify's background color for this song's art, "#rrggbb"
-    metaSource: text("meta_source").notNull(), // spotify (API) | page (public pages) | oembed | none
+    metaSource: text("meta_source").notNull(), // spotify (API) | page (public pages) | statsfm | playlist | oembed | none
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("tracks_isrc_idx").on(t.isrc), index("tracks_song_key_idx").on(t.songKey)],
@@ -173,6 +175,186 @@ export const reactions = pgTable(
   (t) => [uniqueIndex("reactions_user_target_kind_idx").on(t.userId, t.target, t.kind), index("reactions_target_idx").on(t.target)],
 );
 
+// ---------------------------------------------------------------------------- stats.fm
+
+export const STATSFM_STATUS = ["ok", "gone", "error"] as const;
+
+/**
+ * A member's stats.fm account. We only ever read public data for the username the
+ * member gave us, and we keep their own privacy choices (from stats.fm) next to
+ * two switches of ours, so they can show less here than they show there.
+ */
+export const statsfmAccounts = pgTable(
+  "statsfm_accounts",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    statsfmId: text("statsfm_id").notNull(), // stable stats.fm user id
+    customId: text("custom_id"), // their vanity handle, if any
+    displayName: text("display_name").notNull(),
+    imageUrl: text("image_url"),
+    isPlus: boolean("is_plus").notNull().default(false),
+    privacy: text("privacy").notNull().default("{}"), // JSON: their stats.fm privacy flags
+    showLive: boolean("show_live").notNull().default(true), // our switch: show what I'm playing
+    showPlays: boolean("show_plays").notNull().default(true), // our switch: show play counts
+    lifetimeStreams: integer("lifetime_streams"),
+    lifetimeMs: bigint("lifetime_ms", { mode: "number" }),
+    uniqueTracks: integer("unique_tracks"),
+    status: text("status").$type<(typeof STATSFM_STATUS)[number]>().notNull().default("ok"),
+    lastError: text("last_error"),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("statsfm_accounts_statsfm_id_idx").on(t.statsfmId)],
+);
+
+/**
+ * Someone's most-played songs for a period, as stats.fm ranks them.
+ * period: "lifetime" | "weeks" (last 4 weeks) | "months" (last 6 months) | "m:YYYY-MM" (a calendar month)
+ */
+export const listenTops = pgTable(
+  "listen_tops",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    period: text("period").notNull(),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => tracks.id),
+    position: integer("position").notNull(),
+    streams: integer("streams").notNull(),
+    playedMs: bigint("played_ms", { mode: "number" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.period, t.trackId] }), index("listen_tops_rank_idx").on(t.userId, t.period, t.position)],
+);
+
+/** When each person's period was last fetched, and how deep it goes. */
+export const listenSyncs = pgTable(
+  "listen_syncs",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    period: text("period").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+    rows: integer("rows").notNull(),
+    /** play count of the last row: songs not listed have at most this many plays */
+    floor: integer("floor"),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.period] })],
+);
+
+/** The last thing we saw someone playing (cached for about a minute). */
+export const nowPlaying = pgTable("now_playing", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  trackId: text("track_id").references(() => tracks.id),
+  isPlaying: boolean("is_playing").notNull().default(false),
+  progressMs: integer("progress_ms"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+});
+
+// ---------------------------------------------------------------------------- monthly lists
+
+/** One month's group list for a crew: a pool, everyone's ballot, a reveal. */
+export const monthlyRounds = pgTable(
+  "monthly_rounds",
+  {
+    id: text("id").primaryKey(),
+    crewId: text("crew_id")
+      .notNull()
+      .references(() => crews.id, { onDelete: "cascade" }),
+    month: text("month").notNull(), // "YYYY-MM"
+    status: text("status").$type<"open" | "revealed">().notNull().default("open"),
+    poolBuiltAt: timestamp("pool_built_at", { withTimezone: true }),
+    revealedAt: timestamp("revealed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("monthly_rounds_crew_month_idx").on(t.crewId, t.month)],
+);
+
+/** The songs in a month's pool: from what people actually played, or nominated by hand. */
+export const monthlyPool = pgTable(
+  "monthly_pool",
+  {
+    roundId: text("round_id")
+      .notNull()
+      .references(() => monthlyRounds.id, { onDelete: "cascade" }),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => tracks.id),
+    source: text("source").$type<"plays" | "nomination">().notNull(),
+    nominatedBy: text("nominated_by").references(() => users.id, { onDelete: "set null" }),
+    /** JSON [{ userId, rank, streams }]: whose month put it here */
+    detail: text("detail").notNull().default("[]"),
+    weight: real("weight").notNull().default(0),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.roundId, t.trackId] })],
+);
+
+/** One person's ranking of the month's pool. */
+export const monthlyBallots = pgTable(
+  "monthly_ballots",
+  {
+    roundId: text("round_id")
+      .notNull()
+      .references(() => monthlyRounds.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => tracks.id),
+    position: integer("position").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.roundId, t.userId, t.trackId] })],
+);
+
+/** The revealed group ranking, frozen at reveal time. */
+export const monthlyResults = pgTable(
+  "monthly_results",
+  {
+    roundId: text("round_id")
+      .notNull()
+      .references(() => monthlyRounds.id, { onDelete: "cascade" }),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => tracks.id),
+    position: integer("position").notNull(),
+    score: real("score").notNull(),
+    voters: integer("voters").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roundId, t.trackId] })],
+);
+
+// ---------------------------------------------------------------------------- plumbing
+
+/** Fixed-window counters for rate limiting actions, shared across server instances. */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
+);
+
+/** Playlists the app keeps on the owner's Spotify account ("column:<userId>", "month:<roundId>"). */
+export const spotifyMirrors = pgTable("spotify_mirrors", {
+  key: text("key").primaryKey(),
+  playlistId: text("playlist_id").notNull(),
+  url: text("url").notNull(),
+  snapshotId: text("snapshot_id"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }),
+  lastError: text("last_error"),
+});
+
 /** Small key/value store (e.g. the app owner's Spotify refresh token). */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
@@ -183,3 +365,5 @@ export const settings = pgTable("settings", {
 export type User = typeof users.$inferSelect;
 export type Track = typeof tracks.$inferSelect;
 export type Origin = typeof origins.$inferSelect;
+export type StatsfmAccount = typeof statsfmAccounts.$inferSelect;
+export type MonthlyRound = typeof monthlyRounds.$inferSelect;

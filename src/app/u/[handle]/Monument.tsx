@@ -28,7 +28,23 @@ export type MonumentSong = {
   steal: boolean;
   /** friends' reactions to this song on this column */
   reactions: Counts;
+  /** lifetime plays from stats.fm, if this person shares them. `under`: past the depth we fetched */
+  plays?: { streams: number | null; rank: number | null; under: number | null } | null;
 };
+
+export type Receipts = {
+  streams: number | null;
+  hours: number | null;
+  mostPlayed: { name: string; rank: number; streams: number } | null;
+  topIsMost: boolean;
+};
+
+function playsText(p: MonumentSong["plays"]) {
+  if (!p) return null;
+  if (p.streams != null) return `${p.streams.toLocaleString()} ${p.streams === 1 ? "play" : "plays"}`;
+  if (p.under) return `under ${p.under} plays`;
+  return null;
+}
 
 export type Friend = { name: string; handle: string; color: string; rank: number };
 export type Neighbor = GroundMember;
@@ -52,9 +68,11 @@ export function Monument({
   storyHref,
   toolbar,
   neighbors,
+  receipts = null,
 }: {
   person: { id: string; name: string; handle: string; color: string };
   songs: MonumentSong[];
+  receipts?: Receipts | null;
   isMe: boolean;
   storyHref: string;
   toolbar?: React.ReactNode;
@@ -193,6 +211,24 @@ export function Monument({
             {isMe ? "Your all-timers" : `${person.name}'s all-timers`} · {songs.length} {songs.length === 1 ? "song" : "songs"}
           </p>
           {toolbar && <div className="mt-4 flex flex-wrap justify-center gap-2">{toolbar}</div>}
+          {receipts && (receipts.streams != null || receipts.mostPlayed || receipts.topIsMost) && (
+            <div className="mon-receipts">
+              {receipts.streams != null && (
+                <span className="sticker sticker-paper rotate-1">
+                  {receipts.streams.toLocaleString()} plays all time{receipts.hours != null && ` · ${receipts.hours.toLocaleString()} hours`}
+                </span>
+              )}
+              {receipts.topIsMost && <span className="sticker sticker-paper -rotate-1">#1 is also the most played. Consistent.</span>}
+              {receipts.mostPlayed && (
+                <span className="sticker sticker-paper -rotate-1">
+                  Most played here: {receipts.mostPlayed.name} ({receipts.mostPlayed.streams.toLocaleString()}), ranked #{receipts.mostPlayed.rank}
+                </span>
+              )}
+              <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="mon-credit">
+                plays via stats.fm
+              </a>
+            </div>
+          )}
         </header>
         {/* the name, huge, behind the top of the column */}
         <h1 className="mon-giant" style={giantStyle}>
@@ -408,6 +444,11 @@ function Nameplate({
         <span className="mon-artist" style={{ fontSize: Math.max(9.5, 0.036 * m * k) }}>
           {song.artists}
         </span>
+        {playsText(song.plays) && (
+          <span className="mon-plays" style={{ fontSize: Math.max(9, 0.03 * m * k) }}>
+            {playsText(song.plays)}
+          </span>
+        )}
       </button>
       {(tags.length > 0 || song.from || song.steal || reacts.length > 0) && (
         <div className={`mon-stickers ${align === "end" ? "justify-end" : align === "center" ? "justify-center" : ""}`}>
@@ -496,6 +537,13 @@ function Plaque({
             <h2 className="mt-1 font-[family-name:var(--font-garamond)] text-3xl font-semibold leading-tight text-[#2f281e]">{song.name}</h2>
             <div className="mt-1 text-[#5b5143]">{song.artists}</div>
             {meta && <div className="text-sm text-[#8a7f6d]">{meta}</div>}
+            {song.plays && playsText(song.plays) && (
+              <div className="mt-2 text-sm text-[#6e624f]">
+                <span className="font-semibold text-[#3d3427]">{playsText(song.plays)}</span>
+                {song.plays.rank != null && <> · #{song.plays.rank} most played, ever</>}
+                <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-[#a3977f] hover:underline">stats.fm</a>
+              </div>
+            )}
           </div>
         </div>
         {(song.love || song.moment || song.found || song.memory) && (

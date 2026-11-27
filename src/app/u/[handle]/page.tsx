@@ -16,6 +16,7 @@ import { getSocial } from "@/lib/social";
 import { getCrewOverview } from "@/lib/lists";
 import { Altitude } from "@/components/World";
 import { getReactions, songTarget } from "@/lib/reactions";
+import { getPlays, refreshListening } from "@/lib/listening";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -24,6 +25,13 @@ function foundText(o: Entry["origin"]) {
   if (via === "someone" && o.fromName) return `Put on by ${o.fromName}`;
   const tag = FOUND_VIA_OPTIONS.find((x) => x.value === via)?.tag;
   return tag ? tag.charAt(0).toUpperCase() + tag.slice(1) : null;
+}
+
+function playsFor(p: Awaited<ReturnType<typeof getPlays>>, id: string) {
+  const hit = p.byTrack.get(id);
+  if (hit) return { streams: hit.streams, rank: hit.rank, under: null };
+  if (p.floor && p.floor > 0) return { streams: null, rank: null, under: p.floor };
+  return null;
 }
 
 export default async function ProfilePage({ params, searchParams }: PageProps<"/u/[handle]">) {
@@ -41,11 +49,14 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   // The monument is the default way to see an all-time list; ?view=list is the plain list.
   if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
-    const [social, overview, reacts] = await Promise.all([
+    const [social, overview, reacts, plays] = await Promise.all([
       getSocial(viewer.crewId, viewer.id),
       getCrewOverview(viewer.crewId),
       getReactions(allTime.map((e) => songTarget(person.id, e.track.id)), viewer.id),
+      getPlays(person.id, allTime.map((e) => e.track.id)),
     ]);
+    // stale numbers are refreshed after the page is sent; the next visit sees them
+    after(() => refreshListening(person.id));
     const echoes = social.echoesFor(person.id);
     // the next columns to visit: everyone else with a list, starting after this person
     const order = overview.filter((o) => o.count > 0);
@@ -78,13 +89,26 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       from: e.origin?.fromUser ? { name: e.origin.fromUser.name, handle: e.origin.fromUser.handle, color: e.origin.fromUser.color } : null,
       steal: !isMe && !social.has(e.track),
       reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
+      plays: plays.shown ? playsFor(plays, e.track.id) : null,
     }));
+    const counted = songs.filter((x) => x.plays?.streams != null);
+    const mostPlayed = counted.length >= 3 ? counted.reduce((a, b) => (b.plays!.streams! > a.plays!.streams! ? b : a)) : null;
+    const receipts =
+      plays.shown || plays.totals
+        ? {
+            streams: plays.totals?.streams ?? null,
+            hours: plays.totals?.hours ?? null,
+            mostPlayed: mostPlayed && mostPlayed.rank !== 1 ? { name: mostPlayed.name, rank: mostPlayed.rank, streams: mostPlayed.plays!.streams! } : null,
+            topIsMost: !!mostPlayed && mostPlayed.rank === 1,
+          }
+        : null;
     const btn = "sticker sticker-paper sticker-lg";
     return (
       <Monument
         person={{ id: person.id, name: person.name, handle: person.handle, color: person.color }}
         neighbors={neighbors}
         songs={songs}
+        receipts={receipts}
         isMe={isMe}
         storyHref={`/me/stories?list=all_time`}
         toolbar={

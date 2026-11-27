@@ -8,6 +8,9 @@ import { LinkMaker } from "./LinkMaker";
 import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails } from "./actions";
 import { ActionButton } from "./ActionButton";
 import { Altitude } from "@/components/World";
+import { StatsfmPanel, type StatsfmView } from "./StatsfmPanel";
+import { getAccount, visibility } from "@/lib/listening";
+import { timeAgo } from "@/lib/time";
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const user = await requireUser();
@@ -18,6 +21,26 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const spotifyConnected =
     user.isAdmin &&
     (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token"))).length > 0;
+  const acct = await getAccount(user.id);
+  let statsfm: StatsfmView | null = null;
+  if (acct) {
+    const v = visibility({ ...acct, showLive: true, showPlays: true });
+    const lastSync = (await db.select().from(schema.listenSyncs).where(eq(schema.listenSyncs.userId, user.id)))
+      .map((s) => s.fetchedAt.getTime())
+      .sort((a, b) => b - a)[0];
+    statsfm = {
+      displayName: acct.displayName,
+      customId: acct.customId,
+      imageUrl: acct.imageUrl,
+      status: acct.status,
+      showLive: acct.showLive,
+      showPlays: acct.showPlays,
+      hidden: { live: !v.live, tops: !v.tops, totals: !v.totals },
+      streams: v.totals ? acct.lifetimeStreams : null,
+      hours: v.totals && acct.lifetimeMs != null ? Math.round(Number(acct.lifetimeMs) / 3_600_000) : null,
+      synced: lastSync ? timeAgo(lastSync) : null,
+    };
+  }
   const hasSpotifyApp = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 
   return (
@@ -31,6 +54,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           There are no passwords. Make a link here and open it on your phone or laptop to sign in there.
         </p>
         <LinkMaker make={makeMyLoginLink} label="Make a sign-in link" />
+      </section>
+
+      <section className="space-y-3" id="statsfm">
+        <h2 className="font-medium">Listening (stats.fm)</h2>
+        <StatsfmPanel key={acct?.statsfmId ?? "none"} account={statsfm} />
       </section>
 
       <section className="space-y-3">

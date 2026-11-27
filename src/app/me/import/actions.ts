@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { saveList } from "@/lib/lists";
 import { parseTrackInput, resolveTracks } from "@/lib/spotify";
 import { artistLine } from "@/lib/songs";
+import { budget, parse, zKind, zTrackIds } from "@/lib/guard";
+import { z } from "zod";
 
 export type PreviewTrack = { id: string; name: string; artists: string; album: string; year: number | null; imageUrl: string | null; known: boolean };
 export type PreviewResult = {
@@ -17,8 +19,11 @@ export type PreviewResult = {
   alreadyOnList: number;
 };
 
-export async function previewImport(text: string, kind: ListKind): Promise<PreviewResult> {
+export async function previewImport(textIn: string, kindIn: ListKind): Promise<PreviewResult> {
   const user = await requireUser();
+  const text = parse(z.string().max(200_000), textIn);
+  const kind = parse(zKind, kindIn);
+  await budget("import", user.id);
   const parsed = parseTrackInput(text);
   const tracks = await resolveTracks(parsed.ids.slice(0, 300));
   const db = await getDb();
@@ -45,8 +50,12 @@ export async function previewImport(text: string, kind: ListKind): Promise<Previ
 }
 
 /** replace: the pasted order becomes the list. append: new songs go to the bottom. */
-export async function saveImport(kind: ListKind, ids: string[], mode: "replace" | "append") {
+export async function saveImport(kindIn: ListKind, idsIn: string[], modeIn: "replace" | "append") {
   const user = await requireUser();
+  const kind = parse(zKind, kindIn);
+  const ids = parse(zTrackIds, idsIn);
+  const mode = parse(z.enum(["replace", "append"]), modeIn);
+  await budget("import", user.id);
   const db = await getDb();
   let order = ids;
   if (mode === "append") {
