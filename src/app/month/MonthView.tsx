@@ -28,6 +28,7 @@ import { Altitude } from "@/components/World";
 import { queueMonthMirror, syncMonth } from "@/lib/mirror";
 import { Ballot, type PoolCard } from "./Ballot";
 import { NominateForm } from "./NominateForm";
+import { SavePlaylist } from "./SavePlaylist";
 
 
 export async function MonthView({ viewer, month }: { viewer: User; month: string }) {
@@ -83,7 +84,9 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
       .filter((d) => who.has(d.userId))
       .map((d) => {
         const u = who.get(d.userId)!;
-        return { name: u.id === viewer.id ? "You" : u.name, color: u.color, rank: d.rank, streams: d.streams };
+        // play counts follow each person's "show my play counts" switch; the rank always shows
+        const showCount = u.id === viewer.id || visibility(accts.get(u.id)).plays;
+        return { name: u.id === viewer.id ? "You" : u.name, color: u.color, rank: d.rank, streams: showCount ? d.streams : null };
       }),
   }));
   const myNominations = pool.filter((p) => p.nominatedBy === viewer.id).length;
@@ -113,16 +116,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
             </span>
           ))}
         </div>
-        {playlistUrl && (
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <a href={playlistUrl} target="_blank" rel="noopener noreferrer" className="sticker sticker-steal sticker-lg -rotate-1">
-              ▶ Save this month&apos;s playlist on Spotify
-            </a>
-            <span className="text-sm text-white/85">
-              {phase === "revealed" ? "Now in the group's final order." : "Listen through it, then rank below. It grows as the pool does."}
-            </span>
-          </div>
-        )}
+        {playlistUrl && <SavePlaylist url={playlistUrl} revealed={phase === "revealed"} />}
       </header>
 
       {phase === "revealed" ? (

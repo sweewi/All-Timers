@@ -29,7 +29,7 @@ export type PoolCard = {
   imageUrl: string | null;
   nominatedBy: string | null;
   mine: boolean;
-  from: { name: string; color: string; rank: number; streams: number }[];
+  from: { name: string; color: string; rank: number; streams: number | null }[];
 };
 
 /**
@@ -144,10 +144,10 @@ export function Ballot({
                     key={f.name}
                     className="sticker sticker-friend"
                     style={{ ["--c" as string]: f.color }}
-                    title={`${f.streams} plays this month`}
+                    title={f.streams != null ? `${f.streams} plays this month` : `their #${f.rank} this month`}
                   >
-                    {f.name} #{f.rank} · {f.streams}{" "}
-                    {f.streams === 1 ? "play" : "plays"}
+                    {f.name} #{f.rank}
+                    {f.streams != null && ` · ${f.streams} ${f.streams === 1 ? "play" : "plays"}`}
                   </span>
                 ))}
                 {p.nominatedBy && (

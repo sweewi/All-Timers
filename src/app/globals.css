@@ -818,3 +818,77 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
 .quick-listen iframe { border-radius: 12px; flex: 1; border: 0; }
 .quick-listen button { width: 32px; height: 32px; font-size: 20px; color: #8a7f6d; }
 .quick-listen button:hover { color: #b3261e; }
+.save-playlist { margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; max-width: 40rem; }
+.save-steps { flex-basis: 100%; margin-top: 0.25rem; padding: 12px 16px 12px 34px; list-style: decimal; background: rgba(251, 247, 238, 0.94); color: #3a3125; border-radius: 4px; font-size: 14px; line-height: 1.45; box-shadow: 0 18px 40px -22px rgba(15, 25, 80, 0.6); }
+.save-steps li + li { margin-top: 2px; }
+
+/* ---- the guide ---- */
+.help-btn {
+  width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center;
+  font-family: var(--font-tall), sans-serif; font-size: 16px; line-height: 1;
+  color: #fff; background: var(--klein); box-shadow: 0 0 0 2px #fff, 0 4px 10px -4px rgba(20, 25, 60, 0.6);
+  transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1);
+}
+.help-btn:hover { transform: rotate(-8deg) scale(1.08); }
+.guide-backdrop {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px;
+  background: radial-gradient(ellipse at 50% 30%, rgba(31, 63, 191, 0.55), rgba(10, 16, 60, 0.78));
+  backdrop-filter: blur(6px); animation: guide-in 0.25s ease-out;
+}
+.guide-card {
+  position: relative; width: min(560px, 100%); max-height: min(88svh, 760px); overflow: auto;
+  background: var(--paper); color: #2f281e; border-radius: 6px; padding: 20px 24px 18px;
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.6), 0 0 0 3px #fff; rotate: -0.4deg;
+  animation: guide-card 0.35s cubic-bezier(.2, 1.3, .4, 1);
+}
+.guide-top { display: flex; align-items: center; gap: 10px; }
+.guide-x { margin-left: auto; font-size: 26px; line-height: 1; color: #a3977f; }
+.guide-x:hover { color: #2f281e; }
+.guide-title { margin-top: 14px; font-family: var(--font-garamond), serif; font-weight: 600; font-size: 30px; line-height: 1.1; }
+.guide-check { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px; border-radius: 999px; background: #2f8f5b; color: #fff; font-size: 15px; vertical-align: 4px; }
+.guide-body { margin-top: 10px; font-size: 16px; line-height: 1.5; color: #3d3427; }
+.guide-body > * + * { margin-top: 10px; }
+.guide-tip { font-size: 13.5px; color: #7b6f5c; font-style: italic; border-left: 3px solid #e2d6bf; padding-left: 10px; }
+.guide-go { display: inline-block; font-weight: 600; color: #a2432f; text-decoration: underline; text-underline-offset: 4px; }
+.guide-go:hover { color: var(--coral); }
+.guide-list { padding-left: 20px; list-style: disc; }
+.guide-list li + li { margin-top: 4px; }
+.guide-steps { list-style: decimal; }
+.guide-art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; margin: 4px 0 6px; border-radius: 6px; background: linear-gradient(180deg, #2a48c9, #6d8fe6); }
+.guide-art:has(.guide-arrow) { flex-direction: row; flex-wrap: wrap; }
+.guide-arrow { color: #fff; font-size: 22px; }
+.guide-art-columns { flex-direction: row; align-items: flex-end; gap: 18px; height: 140px; }
+.guide-art-columns span { width: 26px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, #d9d2c5, #fbf8f1 45%, #cfc6b6); box-shadow: 0 -10px 0 -4px #efe8da; }
+.guide-plate { min-width: 220px; text-align: center; padding: 8px 18px 10px; background: #f7f3ea; border: 2px solid #c9a24a; box-shadow: 0 6px 16px -8px rgba(0,0,0,0.6); }
+.guide-plate small { display: block; color: #8a6a2a; letter-spacing: 0.2em; }
+.guide-plate b { display: block; font-family: var(--font-garamond), serif; font-size: 22px; font-weight: 500; }
+.guide-plate span { display: block; font-size: 11px; letter-spacing: 0.18em; color: #5b5143; }
+.guide-plate em { display: block; font-style: normal; font-size: 10px; letter-spacing: 0.12em; color: #8a7a5c; margin-top: 2px; }
+.guide-quote { max-width: 340px; text-align: center; padding: 14px 16px; background: #fbf7ee; font-family: var(--font-garamond), serif; font-style: italic; font-size: 19px; line-height: 1.3; box-shadow: 0 10px 24px -12px rgba(0,0,0,0.6); rotate: 1deg; }
+.guide-vs { font-family: var(--font-tall), sans-serif; font-size: 56px; color: #fff; letter-spacing: 0.04em; text-shadow: 0 4px 18px rgba(0,0,0,0.3); }
+.guide-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.guide-form input { flex: 1; min-width: 0; border: 1px solid #d9cfbd; background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 15px; outline: none; }
+.guide-form input:focus { border-color: #b08a3e; }
+.guide-linkbox { padding: 10px 12px; border: 1px dashed #d9cfbd; border-radius: 8px; background: #fff; }
+.guide-linkbox code { display: block; font-size: 12px; word-break: break-all; color: #5b5143; }
+.guide-nav { position: sticky; bottom: -18px; margin: 18px -24px -18px; padding: 12px 24px 16px; display: flex; align-items: center; gap: 12px; background: linear-gradient(transparent, var(--paper) 30%); }
+.guide-back { font-size: 14px; color: #8a7f6d; }
+.guide-back:disabled { visibility: hidden; }
+.guide-nav .sticker-lg { margin-left: auto; }
+.guide-dots { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; flex: 1; }
+.guide-dots button { width: 8px; height: 8px; border-radius: 99px; background: #e2d6bf; }
+.guide-dots button.is-done { background: #8fc5a5; }
+.guide-dots button.is-on { width: 20px; background: var(--coral); }
+@keyframes guide-in { from { opacity: 0; } }
+@keyframes guide-card { from { opacity: 0; transform: translateY(16px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .guide-backdrop, .guide-card { animation: none; } }
+@media (max-width: 520px) { .guide-card { padding: 16px 18px 16px; } .guide-title { font-size: 26px; } .guide-nav { margin: 16px -18px -16px; padding: 10px 18px 14px; } }
+.help-btn { flex: none; }
+@media (max-width: 430px) {
+  header[data-site-header] .nav-name { display: none; }
+}
+@media (max-width: 400px) {
+  [data-site-header] nav { column-gap: 8px; padding: 8px 10px 8px 12px; letter-spacing: 0.02em; }
+  [data-site-header] .brand { font-size: 17px !important; }
+  .help-btn { width: 26px; height: 26px; font-size: 15px; }
+}

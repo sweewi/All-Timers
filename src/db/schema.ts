@@ -30,6 +30,8 @@ export const users = pgTable(
     handle: text("handle").notNull().unique(),
     color: text("color").notNull(),
     isAdmin: boolean("is_admin").notNull().default(false),
+    /** when they finished or closed the first-run guide; null = show it on next visit */
+    guideSeenAt: timestamp("guide_seen_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("users_crew_idx").on(t.crewId)],

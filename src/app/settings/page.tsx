@@ -1,11 +1,12 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
-import { getCrewMembers } from "@/lib/lists";
+import { getCrewMembers, getCrewOverview } from "@/lib/lists";
 import { signOut } from "@/app/actions";
 import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
-import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
+import { MemberRow } from "./MemberRow";
+import { makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
 import { ActionButton } from "./ActionButton";
 import { Altitude } from "@/components/World";
 import { StatsfmPanel, type StatsfmView } from "./StatsfmPanel";
@@ -18,6 +19,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const db = await getDb();
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)))[0];
   const members = user.isAdmin ? await getCrewMembers(user.crewId) : [];
+  const counts = new Map(
+    user.isAdmin ? (await getCrewOverview(user.crewId)).map((o) => [o.member.id, o.count] as const) : [],
+  );
   const spotifyConnected =
     user.isAdmin &&
     (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token"))).length > 0;
@@ -68,18 +72,18 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
       {user.isAdmin && (
         <>
-          <section className="space-y-3">
+          <section className="space-y-3" id="members">
             <h2 className="font-medium">Members</h2>
-            <p className="text-sm text-muted">If someone loses access, make them a sign-in link and send it to them.</p>
+            <p className="text-sm text-muted">
+              Admins can make sign-in links for anyone who lost access, make other admins, remove members, and run the Spotify hub.
+              Anyone in the group can already invite people with the invite link above; admin isn&apos;t needed for that.
+            </p>
             <ul className="divide-y divide-line rounded-2xl border border-line">
               {members.map((m) => (
-                <li key={m.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} />
-                  <span className="flex-1">
-                    {m.name} {m.isAdmin && <span className="text-xs text-muted">(admin)</span>}
-                  </span>
-                  {m.id !== user.id && <LinkMaker make={makeLoginLinkFor.bind(null, m.id)} label="Sign-in link" />}
-                </li>
+                <MemberRow
+                  key={m.id}
+                  m={{ id: m.id, name: m.name, color: m.color, isAdmin: m.isAdmin, isMe: m.id === user.id, songs: counts.get(m.id) ?? 0 }}
+                />
               ))}
             </ul>
           </section>

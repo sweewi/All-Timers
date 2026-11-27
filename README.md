@@ -61,6 +61,11 @@ Members can link their [stats.fm](https://stats.fm) profile in Settings (usernam
 
 Being a good guest to an unofficial API: requests are throttled (2 at a time), cached (4 h to 24 h depending on the data), refreshed after pages render rather than during, backed off on 429, and the site works without it.
 
+## Admin, guide
+
+- **Admins** (Settings → Members): make sign-in links for anyone who lost access, make or remove admins (there's always at least one), and remove a member with all their data (typed confirmation). Anyone can invite people with the invite link.
+- **The guide**: opens by itself on someone's first visit (setup checklist with live status, then a tour with examples), resumes after they import their list, and reopens any time from the **?** in the header. Seen-state is stored per member (`users.guide_seen_at`).
+
 ## Safety
 
 - Every outbound request goes through `src/lib/net.ts`: host allowlist (Spotify, stats.fm), HTTPS only, redirects re-checked, timeouts, size caps, retries with backoff, per-host circuit breaker

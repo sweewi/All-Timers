@@ -36,6 +36,20 @@
       "when": 1795746486517,
       "tag": "0004_mirror_content_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795747786065,
+      "tag": "0005_refetch_listening_by_plays",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795747952662,
+      "tag": "0006_guide_seen",
+      "breakpoints": true
     }
   ]
 }

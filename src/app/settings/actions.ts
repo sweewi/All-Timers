@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, ne } from "drizzle-orm";
+import { and, eq, inArray, like, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { createLoginLink, requireUser } from "@/lib/auth";
 import { resolveTracks } from "@/lib/spotify";
@@ -9,7 +9,8 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { budget, parse, zId } from "@/lib/guard";
 import { RateLimited } from "@/lib/ratelimit";
-import { mirrorCrew } from "@/lib/mirror";
+import { mirrorCrew, syncMonth } from "@/lib/mirror";
+import { rebuildCurrentPool } from "@/lib/monthly";
 import { connectStatsfm, disconnectStatsfm, refreshListening, setSwitches } from "@/lib/listening";
 
 export async function makeMyLoginLink() {
@@ -58,7 +59,11 @@ export async function connectStatsfmAction(input: string): Promise<StatsfmAction
   }
   const r = await connectStatsfm(user.id, text);
   if (!r.ok) return { ok: false, message: r.message };
-  after(() => refreshListening(user.id, { force: true }));
+  after(async () => {
+    await refreshListening(user.id, { force: true });
+    const round = await rebuildCurrentPool(user.crewId);
+    await syncMonth(round.id);
+  });
   refresh();
   return { ok: true };
 }
@@ -66,6 +71,10 @@ export async function connectStatsfmAction(input: string): Promise<StatsfmAction
 export async function disconnectStatsfmAction() {
   const user = await requireUser();
   await disconnectStatsfm(user.id);
+  after(async () => {
+    const round = await rebuildCurrentPool(user.crewId);
+    await syncMonth(round.id);
+  });
   refresh();
 }
 
@@ -88,6 +97,8 @@ export async function refreshStatsfmNow(): Promise<string> {
     throw e;
   }
   const r = await refreshListening(user.id, { force: true });
+  const round = await rebuildCurrentPool(user.crewId);
+  after(() => syncMonth(round.id));
   refresh();
   return r.refreshed.length ? "Up to date" : "stats.fm didn't answer. We'll try again later.";
 }
@@ -97,7 +108,64 @@ export async function syncSpotifyMirrors(): Promise<string> {
   const admin = await requireUser();
   if (!admin.isAdmin) throw new Error("Not allowed");
   await budget("link", admin.id);
+  // bring this month's pool up to date first, so the playlist matches what people played
+  await rebuildCurrentPool(admin.crewId);
   const r = await mirrorCrew(admin.crewId);
-  if (r.skipped) return "Connect Spotify first.";
-  return `${r.synced} playlists synced${r.failed ? `, ${r.failed} failed (see logs)` : ""}`;
+  if (r.skipped) return "Connect the hub account first.";
+  if (r.failed) return `${r.synced} synced. ${r.errors.join(" ")}`;
+  return r.synced ? `${r.synced} playlist${r.synced === 1 ? "" : "s"} synced` : "Nothing to sync yet: the pool is empty.";
+}
+
+// ---------------------------------------------------------------------------- members (admin)
+
+async function requireAdminOver(memberIdIn: string) {
+  const admin = await requireUser();
+  if (!admin.isAdmin) throw new Error("Not allowed");
+  const memberId = parse(zId, memberIdIn);
+  await budget("write", admin.id);
+  const db = await getDb();
+  const member = (await db.select().from(schema.users).where(eq(schema.users.id, memberId)))[0];
+  if (!member || member.crewId !== admin.crewId) throw new Error("Not found");
+  return { admin, member, db };
+}
+
+export async function setAdmin(memberId: string, makeAdmin: boolean): Promise<{ ok: boolean; message: string }> {
+  const { admin, member, db } = await requireAdminOver(memberId);
+  const on = parse(z.boolean(), makeAdmin);
+  if (!on) {
+    const admins = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.crewId, admin.crewId), eq(schema.users.isAdmin, true)));
+    if (admins.length <= 1 && admins[0]?.id === member.id) return { ok: false, message: "There has to be at least one admin." };
+  }
+  await db.update(schema.users).set({ isAdmin: on }).where(eq(schema.users.id, member.id));
+  refresh();
+  return { ok: true, message: on ? `${member.name} is now an admin.` : `${member.name} is no longer an admin.` };
+}
+
+/**
+ * Remove a member and everything they made: their lists, stories, moves, reactions,
+ * listening data, ballots and sessions (signed out everywhere). Credits they gave
+ * others ("put on by") become anonymous. The admin must type the member's name.
+ */
+export async function removeMember(memberId: string, typedName: string): Promise<{ ok: boolean; message: string }> {
+  const { admin, member, db } = await requireAdminOver(memberId);
+  if (member.id === admin.id) return { ok: false, message: "You can't remove yourself." };
+  const typed = parse(z.string().max(100), typedName).trim().toLowerCase();
+  if (typed !== member.name.trim().toLowerCase()) return { ok: false, message: `Type "${member.name}" to confirm.` };
+  await db.transaction(async (tx) => {
+    // reactions point at their songs and moves by key, not by foreign key, so clear them by hand
+    const batches = await tx.selectDistinct({ b: schema.rankEvents.batchId }).from(schema.rankEvents).where(eq(schema.rankEvents.userId, member.id));
+    await tx.delete(schema.reactions).where(like(schema.reactions.target, `song:${member.id}:%`));
+    for (let i = 0; i < batches.length; i += 200) {
+      const keys = batches.slice(i, i + 200).map((x) => `moves:${x.b}`);
+      await tx.delete(schema.reactions).where(inArray(schema.reactions.target, keys));
+    }
+    // everything else is tied to the member row and goes with it
+    await tx.delete(schema.users).where(eq(schema.users.id, member.id));
+  });
+  after(async () => {
+    const round = await rebuildCurrentPool(admin.crewId);
+    await syncMonth(round.id);
+  });
+  refresh();
+  return { ok: true, message: `${member.name} was removed.` };
 }

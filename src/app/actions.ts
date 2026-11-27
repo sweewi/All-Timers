@@ -133,3 +133,11 @@ export async function toggleReaction(target: string, kind: string) {
   else await db.insert(schema.reactions).values({ id: newId(), userId: user.id, target, kind: kind as ReactionKind }).onConflictDoNothing();
   return { ok: true as const, on: !had.length };
 }
+
+/** The first-run guide was finished or closed: don't open it by itself again. */
+export async function markGuideSeen() {
+  const user = await requireUser();
+  if (user.guideSeenAt) return;
+  const db = await getDb();
+  await db.update(schema.users).set({ guideSeenAt: new Date() }).where(eq(schema.users.id, user.id));
+}

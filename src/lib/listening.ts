@@ -230,18 +230,23 @@ type Period = "lifetime" | "months" | "weeks" | `m:${string}`;
 async function storeTop(userId: string, period: Period, items: TopTrack[], truncated = true) {
   await upsertTracks(items.map((i) => i.track));
   const db = await getDb();
+  // stats.fm orders by minutes listened; "most played" here means play count, so re-rank
+  // by plays (ties keep stats.fm's order) and number from 1 over the songs we can show
   const seen = new Set<string>();
   const rows: (typeof schema.listenTops.$inferInsert)[] = [];
-  for (const i of items) {
+  const byPlays = items.map((i, idx) => ({ i, idx })).sort((a, b) => b.i.streams - a.i.streams || a.idx - b.idx);
+  for (const { i } of byPlays) {
     const id = spotifyIdOf(i.track);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    rows.push({ userId, period, trackId: id, position: i.position, streams: i.streams, playedMs: i.playedMs ?? null });
+    rows.push({ userId, period, trackId: id, position: rows.length + 1, streams: i.streams, playedMs: i.playedMs ?? null });
   }
   await db.transaction(async (tx) => {
     await tx.delete(schema.listenTops).where(and(eq(schema.listenTops.userId, userId), eq(schema.listenTops.period, period)));
     for (let i = 0; i < rows.length; i += 250) await tx.insert(schema.listenTops).values(rows.slice(i, i + 250));
-    const sync = { fetchedAt: new Date(), rows: rows.length, floor: truncated ? (items[items.length - 1]?.streams ?? null) : 0 };
+    // past the fetched depth, a song most likely has fewer plays than the least-played one we saw
+    const least = items.length ? Math.min(...items.map((i) => i.streams)) : null;
+    const sync = { fetchedAt: new Date(), rows: rows.length, floor: truncated ? least : 0 };
     await tx
       .insert(schema.listenSyncs)
       .values({ userId, period, ...sync })

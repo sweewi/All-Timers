@@ -28,18 +28,32 @@ const CHUNK = 100; // Spotify's per-request limit for playlist items
 const Created = z.object({ id: z.string(), external_urls: z.object({ spotify: z.string() }).partial().optional() });
 const Snapshot = z.object({ snapshot_id: z.string() }).partial();
 
-async function call<T>(token: string, method: "POST" | "PUT", path: string, body: unknown, schema: z.ZodType<T>) {
-  const { data } = await safeFetchJson(`${API}${path}`, schema, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    // PUT (replace) is safe to repeat; POST (create / append) is not
-    retries: method === "PUT" ? 1 : 0,
-    maxBytes: 200_000,
-    timeoutMs: 12_000,
-  });
-  return data;
+class StepError extends Error {
+  constructor(readonly step: string, readonly cause: unknown) {
+    const detail = cause instanceof NetError ? `${cause.status ?? "network"}` : String(cause);
+    super(`${step}: ${detail}`);
+  }
 }
+
+async function call<T>(step: string, token: string, method: "POST" | "PUT", path: string, body: unknown, schema: z.ZodType<T>) {
+  try {
+    const { data } = await safeFetchJson(`${API}${path}`, schema, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      // PUT (replace) is safe to repeat, and Spotify often answers 500/503 to a playlist
+      // that was created a moment ago; POST (create / append) is never repeated blindly
+      retries: method === "PUT" ? 3 : 0,
+      maxBytes: 200_000,
+      timeoutMs: 12_000,
+    });
+    return data;
+  } catch (e) {
+    throw new StepError(step, e);
+  }
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const sha = (s: string, n: number) => createHash("sha256").update(s).digest("hex").slice(0, n);
 
@@ -65,7 +79,7 @@ async function sync(key: string, name: string, description: string, trackIds: st
     let playlistId = existing?.playlistId;
     let url = existing?.url ?? null;
     if (!playlistId) {
-      const made = await call(token, "POST", "/me/playlists", { name: name.slice(0, 100), description: description.slice(0, 300), public: true }, Created);
+      const made = await call("create playlist", token, "POST", "/me/playlists", { name: name.slice(0, 100), description: description.slice(0, 300), public: true }, Created);
       playlistId = made.id;
       url = made.external_urls?.spotify ?? `https://open.spotify.com/playlist/${made.id}`;
       // remember it at once, so a failure below never creates a duplicate next time
@@ -73,6 +87,7 @@ async function sync(key: string, name: string, description: string, trackIds: st
         .insert(schema.spotifyMirrors)
         .values({ key, playlistId, url })
         .onConflictDoUpdate({ target: schema.spotifyMirrors.key, set: { playlistId, url } });
+      await pause(2000); // a brand-new playlist isn't writable for a moment
     } else if (existing?.contentHash && !existing.contentHash.startsWith(`${descTag}:`)) {
       // the description changes once, at the reveal; best effort (the songs matter more)
       await safeFetchText(`${API}/playlists/${playlistId}`, {
@@ -83,9 +98,9 @@ async function sync(key: string, name: string, description: string, trackIds: st
       }).catch((e) => console.error("spotify mirror details", { key, err: String(e) }));
     }
     // replace with the first 100 (an empty list clears it), then append the rest in order
-    let snap = await call(token, "PUT", `/playlists/${playlistId}/items`, { uris: uris.slice(0, CHUNK) }, Snapshot);
+    let snap = await call("set songs", token, "PUT", `/playlists/${playlistId}/items`, { uris: uris.slice(0, CHUNK) }, Snapshot);
     for (let i = CHUNK; i < uris.length; i += CHUNK) {
-      snap = await call(token, "POST", `/playlists/${playlistId}/items`, { uris: uris.slice(i, i + CHUNK) }, Snapshot);
+      snap = await call("add songs", token, "POST", `/playlists/${playlistId}/items`, { uris: uris.slice(i, i + CHUNK) }, Snapshot);
     }
     await db
       .update(schema.spotifyMirrors)
@@ -93,12 +108,21 @@ async function sync(key: string, name: string, description: string, trackIds: st
       .where(eq(schema.spotifyMirrors.key, key));
     return { ok: true, url, tracks: uris.length };
   } catch (e) {
-    const msg = e instanceof NetError ? `${e.message}${e.status ? ` (${e.status})` : ""}` : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    const status = e instanceof StepError && e.cause instanceof NetError ? e.cause.status : null;
     console.error("spotify mirror", { key, err: msg });
     // deleted on Spotify's side: forget it so the next sync makes a new one
-    if (e instanceof NetError && e.status === 404 && existing) await db.delete(schema.spotifyMirrors).where(eq(schema.spotifyMirrors.key, key));
+    if (status === 404 && existing) await db.delete(schema.spotifyMirrors).where(eq(schema.spotifyMirrors.key, key));
     else await db.update(schema.spotifyMirrors).set({ lastError: msg.slice(0, 300) }).where(eq(schema.spotifyMirrors.key, key));
-    return { ok: false, reason: "Spotify refused the update. It'll retry with the next sync." };
+    const hint =
+      status === 403
+        ? " Spotify said forbidden: is the hub account added under User Management in the developer dashboard?"
+        : status === 401
+          ? " The hub connection expired: reconnect it in Settings."
+          : status && status >= 500
+            ? " Spotify's servers hiccuped; it retries on the next sync."
+            : "";
+    return { ok: false, reason: `Spotify refused (${msg}).${hint}` };
   }
 }
 
@@ -156,17 +180,21 @@ export function queueMonthMirror(roundId: string) {
 
 /** Every month that has songs, for the daily cron and the admin button. Unchanged ones cost nothing. */
 export async function mirrorCrew(crewId: string) {
-  if (!(await hubConnected())) return { synced: 0, failed: 0, skipped: true };
+  if (!(await hubConnected())) return { synced: 0, failed: 0, skipped: true, errors: [] as string[] };
   const db = await getDb();
   const rounds = await db.select().from(schema.monthlyRounds).where(eq(schema.monthlyRounds.crewId, crewId));
   let synced = 0;
   let failed = 0;
+  const errors: string[] = [];
   for (const r of rounds) {
     const res = await mirrorMonth(r);
     if (res.ok) synced++;
-    else if (res.reason !== "nothing in the pool yet") failed++;
+    else if (res.reason !== "nothing in the pool yet") {
+      failed++;
+      errors.push(`${monthLabel(r.month)}: ${res.reason}`);
+    }
   }
-  return { synced, failed, skipped: false };
+  return { synced, failed, skipped: false, errors };
 }
 
 /** The hub playlist for a month ("month:<roundId>"), if one exists. */

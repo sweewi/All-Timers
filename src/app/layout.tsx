@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import localFont from "next/font/local";
 import Link from "next/link";
+import { Guide, HelpButton } from "@/components/Guide";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 import { World } from "@/components/World";
@@ -78,9 +79,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   Why room
                 </Link>
                 <span className="flex-1" />
-                <Link href="/settings" className="flex items-center gap-2 text-muted hover:text-foreground">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: user.color }} />
-                  {user.name}
+                <HelpButton />
+                <Link href="/settings" className="flex flex-none items-center gap-2 text-muted hover:text-foreground" aria-label="Settings">
+                  <span className="h-3 w-3 rounded-full" style={{ background: user.color }} />
+                  <span className="nav-name">{user.name}</span>
                 </Link>
               </>
             )}
@@ -88,6 +90,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">{children}</main>
         {user && <Footpath handle={user.handle} />}
+        {user && <Guide autoOpen={!user.guideSeenAt} />}
       </body>
     </html>
   );

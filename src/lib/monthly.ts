@@ -18,9 +18,10 @@ export function phaseOf(round: Pick<MonthlyRound, "month" | "status">, now = Dat
   return { phase: "open" as const, reveal };
 }
 
-/** The pool is rebuilt from fresh plays at most every few hours. */
+/** The pool is rebuilt from the cached plays every 20 minutes at most. */
 export function poolIsStale(round: Pick<MonthlyRound, "poolBuiltAt">, now = Date.now()) {
-  return !round.poolBuiltAt || now - round.poolBuiltAt.getTime() > 3 * 3_600_000;
+  // cheap: stats.fm itself is only asked every few hours (fetchMonth has its own TTL)
+  return !round.poolBuiltAt || now - round.poolBuiltAt.getTime() > 20 * 60_000;
 }
 
 /** The round for this crew and month, created on first sight. */
@@ -43,8 +44,9 @@ export async function pastRounds(crewId: string) {
 }
 
 /**
- * Grow the pool from what members actually played this month. Songs only ever join
- * (never leave) while the round is open, so nobody's ballot loses a song mid-month.
+ * Rebuild the pool from what members actually played this month (by play count).
+ * Songs that have dropped out of everyone's top 5 leave the pool, unless someone
+ * has already ranked them: a ballot never loses a song mid-month. Nominations stay.
  */
 export async function refreshPool(round: MonthlyRound) {
   if (round.status !== "open") return;
@@ -64,27 +66,34 @@ export async function refreshPool(round: MonthlyRound) {
     if (rows.length) perUser.set(userId, rows);
   }
   const pool = buildPool(perUser, PICKS_PER_PERSON, POOL_MAX);
-  if (!pool.length) {
-    await db.update(schema.monthlyRounds).set({ poolBuiltAt: new Date() }).where(eq(schema.monthlyRounds.id, round.id));
-    return;
-  }
+  const fresh = new Map(pool.map((p) => [p.trackId, p]));
   await db.transaction(async (tx) => {
     const existing = await tx.select().from(schema.monthlyPool).where(eq(schema.monthlyPool.roundId, round.id));
+    const ranked = new Set(
+      (await tx.selectDistinct({ t: schema.monthlyBallots.trackId }).from(schema.monthlyBallots).where(eq(schema.monthlyBallots.roundId, round.id))).map((r) => r.t),
+    );
     const have = new Map(existing.map((e) => [e.trackId, e]));
-    const room = Math.max(0, POOL_MAX - existing.length);
-    let added = 0;
+    for (const e of existing) {
+      if (fresh.has(e.trackId)) continue;
+      if (e.source === "plays" && !ranked.has(e.trackId)) {
+        await tx.delete(schema.monthlyPool).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
+      } else if (e.source === "plays") {
+        // kept for the ballots that have it; sinks below this month's real plays
+        await tx.update(schema.monthlyPool).set({ weight: 0.01 }).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
+      } else if (e.detail !== "[]") {
+        await tx.update(schema.monthlyPool).set({ weight: 0.5, detail: "[]" }).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
+      }
+    }
     for (const p of pool) {
       const cur = have.get(p.trackId);
       if (cur) {
-        if (cur.source === "plays" || p.weight > cur.weight) {
-          await tx
-            .update(schema.monthlyPool)
-            .set({ weight: Math.max(cur.weight, p.weight), detail: JSON.stringify(p.detail) })
-            .where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, p.trackId)));
-        }
-      } else if (added < room) {
+        const weight = cur.source === "nomination" ? Math.max(0.5, p.weight) : p.weight;
+        await tx
+          .update(schema.monthlyPool)
+          .set({ weight, detail: JSON.stringify(p.detail) })
+          .where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, p.trackId)));
+      } else {
         await tx.insert(schema.monthlyPool).values({ roundId: round.id, trackId: p.trackId, source: "plays", detail: JSON.stringify(p.detail), weight: p.weight });
-        added++;
       }
     }
     await tx.update(schema.monthlyRounds).set({ poolBuiltAt: new Date() }).where(eq(schema.monthlyRounds.id, round.id));
@@ -237,3 +246,11 @@ export async function poolTrackIds(roundId: string) {
   return rows.map((r) => r.trackId);
 }
 
+
+/** Someone's listening changed (linked, refreshed, unlinked): rebuild this month's pool now. */
+export async function rebuildCurrentPool(crewId: string) {
+  const round = await ensureRound(crewId);
+  if (round.status !== "open") return round;
+  await refreshPool(round);
+  return round;
+}
