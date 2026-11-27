@@ -1,3 +1,4 @@
+import { groupRatingsFor } from "@/lib/ratings";
 import Link from "next/link";
 import { after } from "next/server";
 import { eq } from "drizzle-orm";
@@ -73,6 +74,12 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
   const revealText = new Date(reveal).toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", timeZone: APP_TZ });
   const playlistUrl = mirror[0]?.url ?? null;
 
+  const myScores = new Map(
+    [...(await groupRatingsFor(viewer.crewId, pool.map((p) => p.track.id))).entries()].flatMap(([id, rs]) => {
+      const mine = rs.find((r) => r.userId === viewer.id);
+      return mine ? [[id, mine.score] as const] : [];
+    }),
+  );
   const cards: PoolCard[] = pool.map((p) => ({
     id: p.track.id,
     name: carvedTitle(p.track.name),
@@ -81,6 +88,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
     nominatedBy: p.nominatedBy ? (who.get(p.nominatedBy)?.name ?? "someone") : null,
     mine: p.nominatedBy === viewer.id,
     kept: p.source === "plays" && p.detail.length === 0,
+    myScore: myScores.get(p.track.id) ?? null,
     from: p.detail
       .filter((d) => who.has(d.userId))
       .map((d) => {

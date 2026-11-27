@@ -5,6 +5,7 @@ import { getCrewMembers, getList, type Entry } from "@/lib/lists";
 import { artistList } from "@/lib/songs";
 import { Art, TrackTitle } from "@/components/track";
 import { Altitude } from "@/components/World";
+import { ratingCompare } from "@/lib/ratings";
 
 export default async function ComparePage({ searchParams }: PageProps<"/compare">) {
   const viewer = await requireUser();
@@ -40,11 +41,12 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
 const versionKey = (e: Entry) => e.track.isrc ?? e.track.id;
 
 async function Comparison({ a, b }: { a: User; b: User }) {
-  const [aAll, bAll, aDeck, bDeck] = await Promise.all([
+  const [aAll, bAll, aDeck, bDeck, rc] = await Promise.all([
     getList(a.id, "all_time"),
     getList(b.id, "all_time"),
     getList(a.id, "on_deck"),
     getList(b.id, "on_deck"),
+    ratingCompare(a.id, b.id),
   ]);
 
   // Same exact version (same recording) on both all-time lists.
@@ -85,11 +87,50 @@ async function Comparison({ a, b }: { a: User; b: User }) {
   return (
     <div className="mt-10 space-y-12">
       <Altitude base={0.58} range={0.15} />
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-4">
+        <Stat
+          label="Taste match"
+          value={rc.match != null ? `${rc.match}%` : "—"}
+          hint={rc.match != null ? `from ${rc.shared} songs both rated` : `needs 3 songs both rated (${rc.shared} so far)`}
+        />
         <Stat label="Songs on both lists" value={shared.length} />
         <Stat label="Same song, different version" value={diffVersion.length} />
         <Stat label="Artist overlap" value={`${artistOverlap}%`} hint={`${sharedArtists.length} shared artists`} />
       </section>
+
+      {(rc.disagree.length > 0 || rc.agree.length > 0) && (
+        <section className="grid gap-8 md:grid-cols-2">
+          {[
+            { title: "Where they split", rows: rc.disagree, empty: "" },
+            { title: "Where they agree", rows: rc.agree, empty: "" },
+          ]
+            .filter((g) => g.rows.length)
+            .map((g) => (
+              <div key={g.title}>
+                <h2 className="rank-num text-3xl">{g.title}</h2>
+                <ul className="mt-4 divide-y divide-line">
+                  {g.rows.map((r) => (
+                    <li key={r.track.id} className="flex items-center gap-3 py-3">
+                      <Art track={r.track} />
+                      <div className="min-w-0 flex-1">
+                        <TrackTitle track={r.track} />
+                        {(r.aNote || r.bNote) && (
+                          <p className="truncate text-sm italic text-muted">
+                            {r.aNote ? a.name : b.name}: &ldquo;{r.aNote ?? r.bNote}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                      <span className="flex shrink-0 items-center gap-2 text-sm">
+                        <span className="flex items-center gap-1">{dot(a)} <span className="take-score">{r.a.toFixed(1)}</span></span>
+                        <span className="flex items-center gap-1">{dot(b)} <span className="take-score">{r.b.toFixed(1)}</span></span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+        </section>
+      )}
 
       <section>
         <h2 className="rank-num text-3xl">Both all-timers</h2>
@@ -169,7 +210,7 @@ async function Comparison({ a, b }: { a: User; b: User }) {
         ) : (
           <ul className="mt-4 flex flex-wrap gap-2">
             {sharedArtists.map((s) => (
-              <li key={s.name} className="btn btn-marble btn-sm">
+              <li key={s.name} className="sticker sticker-paper">
                 {s.name}{" "}
                 <span className="text-muted">
                   {s.a}·{s.b}
@@ -186,7 +227,6 @@ async function Comparison({ a, b }: { a: User; b: User }) {
 function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
-      <Altitude base={0.58} range={0.15} />
       <div className="rank-num text-5xl">{value}</div>
       <div className="mt-1 text-sm text-muted">{label}</div>
       {hint && <div className="text-xs text-muted/70">{hint}</div>}

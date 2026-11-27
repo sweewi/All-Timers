@@ -18,6 +18,7 @@ import { Altitude } from "@/components/World";
 import { getReactions, songTarget } from "@/lib/reactions";
 import { getPlays, refreshListening } from "@/lib/listening";
 import { shareAGroup } from "@/lib/groups";
+import { groupRatingsFor } from "@/lib/ratings";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -51,11 +52,12 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   // The monument is the default way to see an all-time list; ?view=list is the plain list.
   if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
-    const [social, overview, reacts, plays] = await Promise.all([
+    const [social, overview, reacts, plays, scored] = await Promise.all([
       getSocial(viewer.crewId, viewer.id),
       getCrewOverview(viewer.crewId),
       getReactions(allTime.map((e) => songTarget(person.id, e.track.id)), viewer.id),
       getPlays(person.id, allTime.map((e) => e.track.id)),
+      groupRatingsFor(viewer.crewId, allTime.map((e) => e.track.id)),
     ]);
     // stale numbers are refreshed after the page is sent; the next visit sees them
     after(() => refreshListening(person.id));
@@ -90,6 +92,10 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         .map((h) => ({ name: h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
       from: e.origin?.fromUser ? { name: e.origin.fromUser.name, handle: e.origin.fromUser.handle, color: e.origin.fromUser.color } : null,
       steal: !isMe && !social.has(e.track),
+      scores: (scored.get(e.track.id) ?? [])
+        .filter((r) => r.userId !== viewer.id)
+        .map((r) => ({ name: r.name, handle: r.handle, color: r.color, score: r.score, note: r.note })),
+      myScore: scored.get(e.track.id)?.find((r) => r.userId === viewer.id)?.score ?? null,
       reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
       plays: plays.shown ? playsFor(plays, e.track.id) : null,
     }));

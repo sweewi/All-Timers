@@ -231,7 +231,7 @@ export async function rateQueue(userId: string, crewId: string, limit = 12) {
     .innerJoin(schema.tracks, eq(schema.tracks.id, schema.listEntries.trackId))
     .where(eq(schema.listEntries.userId, userId))
     .limit(150);
-  for (const o of own) push(o.track, o.kind === "on_deck" ? "on deck" : "on your column");
+  for (const o of own) push(o.track, o.kind === "on_deck" ? "on deck" : "from my column");
   // interleave sources so the queue isn't 12 songs from one place
   return picks.slice(0, limit * 3).sort((a, b) => hash(a.track.id) - hash(b.track.id)).slice(0, limit);
 }
@@ -264,4 +264,34 @@ export async function myRanking(userId: string) {
     .innerJoin(schema.tracks, eq(schema.tracks.id, schema.ratings.trackId))
     .where(eq(schema.ratings.userId, userId))
     .orderBy(desc(schema.ratings.score), desc(schema.ratings.ord));
+}
+
+/** Two people's ratings side by side: taste match, where they disagree most, where they agree. */
+export async function ratingCompare(aId: string, bId: string) {
+  const db = await getDb();
+  const rows = await db
+    .select({ userId: schema.ratings.userId, score: schema.ratings.score, note: schema.ratings.note, track: schema.tracks })
+    .from(schema.ratings)
+    .innerJoin(schema.tracks, eq(schema.tracks.id, schema.ratings.trackId))
+    .where(inArray(schema.ratings.userId, [aId, bId]));
+  const a = new Map<string, number>();
+  const b = new Map<string, number>();
+  const tracks = new Map<string, Track>();
+  const notes = new Map<string, string>();
+  for (const r of rows) {
+    (r.userId === aId ? a : b).set(r.track.id, r.score);
+    tracks.set(r.track.id, r.track);
+    if (r.note) notes.set(`${r.userId}:${r.track.id}`, r.note);
+  }
+  const both = [...a.keys()]
+    .filter((id) => b.has(id))
+    .map((id) => ({ track: tracks.get(id)!, a: a.get(id)!, b: b.get(id)!, gap: Math.abs(a.get(id)! - b.get(id)!), aNote: notes.get(`${aId}:${id}`) ?? null, bNote: notes.get(`${bId}:${id}`) ?? null }));
+  const { match, shared } = tasteMatch(a, b);
+  return {
+    match,
+    shared,
+    rated: { a: a.size, b: b.size },
+    disagree: [...both].sort((x, y) => y.gap - x.gap).filter((x) => x.gap >= 2).slice(0, 5),
+    agree: [...both].sort((x, y) => x.gap - y.gap || y.a + y.b - (x.a + x.b)).filter((x) => x.gap < 1).slice(0, 5),
+  };
 }

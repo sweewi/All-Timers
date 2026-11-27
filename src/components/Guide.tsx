@@ -192,11 +192,11 @@ export function Guide({ autoOpen }: { autoOpen: boolean }) {
             ))}
           </div>
           {last ? (
-            <button type="button" onClick={close} className="sticker sticker-steal sticker-lg">
+            <button type="button" onClick={close} className="btn btn-gold">
               Let&apos;s go
             </button>
           ) : (
-            <button type="button" onClick={() => setI(i + 1)} className="sticker sticker-steal sticker-lg">
+            <button type="button" onClick={() => setI(i + 1)} className="btn btn-gold">
               {i === 0 ? "Show me" : "Next →"}
             </button>
           )}
@@ -247,7 +247,7 @@ function PhoneLink({ reload }: { reload: () => void }) {
       <code>{link}</code>
       <div className="mt-2 flex flex-wrap gap-2">
         {canShare && (
-          <button type="button" className="sticker sticker-steal" onClick={() => navigator.share({ url: link }).catch(() => {})}>
+          <button type="button" className="btn btn-gold btn-sm" onClick={() => navigator.share({ url: link }).catch(() => {})}>
             Send it…
           </button>
         )}
@@ -301,7 +301,7 @@ function StatsfmInline({ reload }: { reload: () => void }) {
         spellCheck={false}
         maxLength={300}
       />
-      <button disabled={pending || !v.trim()} className="sticker sticker-steal">
+      <button disabled={pending || !v.trim()} className="btn btn-gold btn-sm">
         {pending ? "Checking…" : "Link"}
       </button>
       {msg && <p className="w-full text-sm text-[#6e624f]">{msg}</p>}

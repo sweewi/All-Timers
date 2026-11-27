@@ -21,6 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { saveBallotAction, withdrawAction } from "./actions";
+import { RateButton } from "@/components/RateFlow";
 
 export type PoolCard = {
   id: string;
@@ -31,6 +32,8 @@ export type PoolCard = {
   mine: boolean;
   /** dropped out of everyone's top plays but stays because someone already ranked it */
   kept: boolean;
+  /** the viewer's own score for this song, if they've rated it */
+  myScore: number | null;
   from: { name: string; color: string; rank: number; streams: number | null }[];
 };
 
@@ -140,7 +143,8 @@ export function Ballot({
               </button>
               <b>{p.name}</b>
               <small>{p.artists}</small>
-              <span className="mt-2 flex flex-wrap gap-1">
+              <span className="mt-2 flex flex-wrap items-center gap-1">
+                <RateButton song={{ id: p.id, name: p.name, artists: p.artists, imageUrl: p.imageUrl }} score={p.myScore} />
                 {p.from.map((f) => (
                   <span
                     key={f.name}
@@ -186,7 +190,7 @@ export function Ballot({
       <aside className="ballot">
         <div className="flex items-baseline justify-between">
           <h2 className="font-[family-name:var(--font-garamond)] text-2xl font-semibold">
-            Your ballot
+            My ballot
           </h2>
           <span className="text-xs text-[#8a7f6d]">secret till the reveal</span>
         </div>
@@ -220,7 +224,7 @@ export function Ballot({
         <div className="mt-4 flex items-center gap-3">
           <button
             type="button"
-            className="sticker sticker-steal sticker-lg"
+            className="btn btn-gold"
             disabled={pending || !dirty}
             onClick={save}
           >

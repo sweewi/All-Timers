@@ -158,4 +158,46 @@ export async function seedDemo(dbIn: unknown) {
     }
   }
   await ins(schema.ratings, ratingRows);
+
+  // this month: a pool of nominations (nothing here talks to stats.fm) and four ballots in;
+  // last month: revealed, with results
+  const month = monthKey(0);
+  const roundId = "demo-round-now";
+  await ins(schema.monthlyRounds, [
+    { id: roundId, crewId: DEMO_CREW_ID, month, poolBuiltAt: new Date(now) },
+    { id: "demo-round-last", crewId: DEMO_CREW_ID, month: monthKey(-1), status: "revealed", revealedAt: ago(24 * 20) },
+  ]);
+  const poolIds: string[] = [];
+  const poolRows: (typeof schema.monthlyPool.$inferInsert)[] = [];
+  for (const [handle, ids] of lists)
+    for (const id of ids.slice(1, 4)) {
+      if (poolIds.includes(id) || poolRows.filter((r) => r.nominatedBy === demoUserId(handle)).length >= 2) continue;
+      poolIds.push(id);
+      poolRows.push({ roundId, trackId: id, source: "nomination" as const, nominatedBy: demoUserId(handle), weight: 0.5, addedAt: ago(rand() * 200) });
+    }
+  await ins(schema.monthlyPool, poolRows);
+  const ballots: (typeof schema.monthlyBallots.$inferInsert)[] = [];
+  for (const handle of ["ava", "theo", "maya", "jonah"]) {
+    const picks = [...poolIds].sort(() => rand() - 0.5).slice(0, 5);
+    picks.forEach((trackId, i) => ballots.push({ roundId, userId: demoUserId(handle), trackId, position: i + 1, updatedAt: ago(rand() * 48) }));
+  }
+  await ins(schema.monthlyBallots, ballots);
+  const lastIds = lists.flatMap(([, ids]) => ids.slice(4, 6)).filter((id, i, a) => a.indexOf(id) === i).slice(0, 8);
+  await ins(
+    schema.monthlyPool,
+    lastIds.map((trackId) => ({ roundId: "demo-round-last", trackId, source: "nomination" as const, weight: 0.5 })),
+  );
+  await ins(
+    schema.monthlyResults,
+    lastIds.map((trackId, i) => ({ roundId: "demo-round-last", trackId, position: i + 1, score: Math.round((1 - i / lastIds.length) * 100) / 100, voters: 5 })),
+  );
+}
+
+/** "YYYY-MM" of this month (offset 0) or an earlier one, on the site's clock. */
+function monthKey(offset: number) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: process.env.APP_TIMEZONE || "America/New_York", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  const y = Number(parts.find((x) => x.type === "year")!.value);
+  const m = Number(parts.find((x) => x.type === "month")!.value) - 1 + offset;
+  const d = new Date(Date.UTC(y, m, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

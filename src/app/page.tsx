@@ -22,6 +22,8 @@ import { backfillTracks } from "@/lib/spotify";
 import { getAccounts, getLiveNow, heavyRotation, refreshListening, visibility } from "@/lib/listening";
 import { compact } from "@/lib/time";
 import { myGroups } from "@/lib/groups";
+import { freshTakes, groupRatingsFor } from "@/lib/ratings";
+import { RateButton } from "@/components/RateFlow";
 import { GroupSticker } from "@/components/GroupSticker";
 
 export default async function Home() {
@@ -36,13 +38,18 @@ export default async function Home() {
     getSocial(user.crewId, user.id),
   ]);
   const mine = overview.find((o) => o.member.id === user.id);
-  const [reacts, live, rotation, accts, groups] = await Promise.all([
+  const [reacts, live, rotation, accts, groups, takes] = await Promise.all([
     getReactions(feed.map((f) => movesTarget(f.batchId)), user.id),
     getLiveNow(user.crewId, 0), // cache only during render; the browser asks for fresh data
     heavyRotation(user.crewId),
     getAccounts(overview.map((o) => o.member.id)),
     myGroups(user.id),
+    freshTakes(user.crewId, 10),
   ]);
+  const scoreIds = [...new Set([...social.shared.map((s) => s.track.id), ...rotation.map((r) => r.track.id), ...takes.map((t) => t.track.id)])];
+  const scored = await groupRatingsFor(user.crewId, scoreIds);
+  const myScore = (id: string) => scored.get(id)?.find((r) => r.userId === user.id)?.score ?? null;
+  const rateable = (t: { id: string; name: string; artists: string; imageUrl: string | null }) => ({ id: t.id, name: carvedTitle(t.name), artists: artistLine(t.artists), imageUrl: t.imageUrl });
   const liveEnabled = [...accts.values()].some((a) => visibility(a).live);
   const linked = accts.has(user.id);
   after(async () => {
@@ -102,6 +109,49 @@ export default async function Home() {
         </section>
 
         <section>
+          <h2 className="tall-h">
+            The takes <span className="sticker sticker-paper -rotate-2">scores out of 10</span>
+          </h2>
+          <p className="tall-sub">What everyone&apos;s rating, and where somebody went against the room.</p>
+          {takes.length === 0 ? (
+            <p className="paper-note">
+              No ratings yet. <Link href="/rate" className="underline">Rate a few songs</Link> and they show up here for everyone.
+            </p>
+          ) : (
+            <div className="scraps">
+              {takes.slice(0, 6).map((t, i) => (
+                <div key={`${t.user.id}-${t.track.id}`} className="scrap" style={{ rotate: `${[1.1, -1.4, 0.6, -0.8, 1.6, -0.5][i % 6]}deg` }}>
+                  <span className="scrap-tape" />
+                  <Art track={t.track} size={64} />
+                  <div className="min-w-0 flex-1">
+                    <p>
+                      <Link href={`/u/${t.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: t.user.color }}>
+                        {t.user.name}
+                      </Link>{" "}
+                      gave <b>{carvedTitle(t.track.name)}</b> <span className="take-score">{t.score.toFixed(1)}</span>
+                      {t.hot && <span className="hot-take">hot take</span>}
+                    </p>
+                    {t.note && <p className="take-note mt-1">&ldquo;{t.note}&rdquo;</p>}
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-muted">
+                        {timeAgo(t.at)}
+                        {t.others.length > 0 && ` · ${t.others.map((o) => `${o.name} ${o.score.toFixed(1)}`).join(", ")}`}
+                      </span>
+                      {t.user.id !== user.id && <RateButton song={rateable(t.track)} score={myScore(t.track.id)} />}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-4">
+            <Link href="/rate" className="btn btn-gold">
+              Go rate songs
+            </Link>
+          </p>
+        </section>
+
+        <section>
           <h2 className="tall-h">Common ground</h2>
           <p className="tall-sub">Songs more than one of you swear by.</p>
           {social.shared.length === 0 ? (
@@ -127,6 +177,7 @@ export default async function Home() {
                         {h.user.name} #{h.rank}
                       </Link>
                     ))}
+                    <RateButton song={rateable(sh.track)} score={myScore(sh.track.id)} />
                   </span>
                 </div>
               ))}
@@ -191,6 +242,7 @@ export default async function Home() {
                         {r.user.name}
                       </Link>
                       <span className="sticker sticker-paper">{r.streams != null ? `${compact(r.streams)} plays` : `their #${r.position} lately`}</span>
+                      <RateButton song={rateable(r.track)} score={myScore(r.track.id)} />
                     </span>
                     {!mineToo && !social.has(r.track) && (
                       <span className="mt-2">
@@ -217,6 +269,7 @@ export default async function Home() {
             doors={[
               { href: `/u/${user.handle}`, label: "My column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
               { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea", inside: <span className="portal-word">♪</span> },
+              { href: "/rate", label: "Ratings", sub: "score songs, see the takes", tone: "night", inside: <span className="portal-word">8.4</span> },
               { href: "/compare", label: "Compare", sub: "any two of us", tone: "dawn", inside: <span className="portal-word">VS</span> },
               { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea", inside: <span className="portal-word">“ ”</span> },
               { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night", inside: <span className="portal-word">+</span> },

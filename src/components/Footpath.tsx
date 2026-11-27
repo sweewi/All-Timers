@@ -13,6 +13,7 @@ export function Footpath({ handle, cover }: { handle: string; cover?: string | n
     { href: "/", label: "The plaza", sub: "everyone's columns", tone: "dawn" as const, word: "✦" },
     { href: `/u/${handle}`, label: "My column", sub: "climb it", tone: "night" as const, cover },
     { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea" as const, word: "♪" },
+    { href: "/rate", label: "Ratings", sub: "score songs, see the takes", tone: "night" as const, word: "8.4" },
     { href: "/compare", label: "Compare", sub: "any two of us", tone: "dawn" as const, word: "VS" },
     { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea" as const, word: "“ ”" },
     { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night" as const, word: "+" },

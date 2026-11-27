@@ -43,7 +43,7 @@ export function NominateForm({ month }: { month: string }) {
       >
         Paste
       </button>
-      <button disabled={pending || !value.trim()} className="sticker sticker-steal sticker-lg">
+      <button disabled={pending || !value.trim()} className="btn btn-gold">
         {pending ? "Adding…" : "Nominate"}
       </button>
       {msg && <p className={`w-full text-sm ${msg.ok ? "text-[#2f8f5b]" : "text-red-700"}`}>{msg.text}</p>}

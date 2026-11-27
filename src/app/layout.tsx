@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 import { World } from "@/components/World";
 import { Footpath } from "@/components/Footpath";
+import { RateFlowHost } from "@/components/RateFlow";
 import { SandboxBar } from "@/components/SandboxBar";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -75,6 +76,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href="/month" className="text-muted hover:text-foreground">
                   This month
                 </Link>
+                <Link href="/rate" className="text-muted hover:text-foreground">
+                  Ratings
+                </Link>
                 <Link href="/compare" className="hidden text-muted hover:text-foreground sm:inline">
                   Compare
                 </Link>
@@ -94,6 +98,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">{children}</main>
         {user && <Footpath handle={user.handle} />}
         {user && <Guide autoOpen={!user.guideSeenAt} />}
+        {user && <RateFlowHost />}
         <SpeedInsights />
       </body>
     </html>

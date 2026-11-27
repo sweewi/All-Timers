@@ -12,7 +12,7 @@ export function SavePlaylist({ url, revealed }: { url: string; revealed: boolean
   const [copied, setCopied] = useState(false);
   return (
     <div className="save-playlist">
-      <a href={url} target="_blank" rel="noopener noreferrer" className="sticker sticker-steal sticker-lg -rotate-1">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-gold btn-lg">
         ▶ Open the playlist in Spotify
       </a>
       <button

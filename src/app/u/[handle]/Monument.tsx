@@ -1,5 +1,6 @@
 "use client";
 
+import { RateButton } from "@/components/RateFlow";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Altitude } from "@/components/World";
@@ -26,6 +27,9 @@ export type MonumentSong = {
   from: Omit<Friend, "rank"> | null;
   /** the viewer doesn't have it yet: offer "Steal it" */
   steal: boolean;
+  /** the group's ratings of this song (0–10), and the viewer's own */
+  scores: { name: string; handle: string; color: string; score: number; note: string | null }[];
+  myScore: number | null;
   /** friends' reactions to this song on this column */
   reactions: Counts;
   /** lifetime plays from stats.fm, if this person shares them. `under`: past the depth we fetched */
@@ -575,6 +579,18 @@ function Plaque({
             {song.steal && <span className="ml-auto"><StealButton trackId={song.id} fromUserId={ownerId} /></span>}
           </div>
         )}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#d9cfbd] pt-4 text-sm text-[#5b5143]">
+          <span>Scores</span>
+          {song.scores.length === 0 && <span className="text-[#8a7f6d]">Nobody has rated it yet.</span>}
+          {song.scores.map((r) => (
+            <Link key={r.handle} href={`/u/${r.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: r.color }} title={r.note ?? undefined}>
+              {r.name} {r.score.toFixed(1)}
+            </Link>
+          ))}
+          <span className="ml-auto">
+            <RateButton song={{ id: song.id, name: song.name, artists: song.artists, imageUrl: song.imageUrl }} score={song.myScore} />
+          </span>
+        </div>
         <div className="mt-4 flex items-center gap-3 border-t border-[#d9cfbd] pt-4 text-sm text-[#5b5143]">
           <span>{isMe ? "Friends say" : "React"}</span>
           <Reactions target={`song:${ownerId}:${song.id}`} initial={song.reactions} canReact={!isMe} />
