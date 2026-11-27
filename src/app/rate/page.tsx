@@ -9,6 +9,8 @@ import { Altitude } from "@/components/World";
 import { Art } from "@/components/track";
 import { BANDS } from "@/lib/rating-math";
 import { RateSearch } from "./RateSearch";
+import { getReactions, takeTarget } from "@/lib/reactions";
+import { Reactions } from "@/components/Reactions";
 
 export const metadata = { title: "Ratings · All-Timers" };
 
@@ -24,6 +26,7 @@ export default async function RatePage() {
     tasteMatches(user.id, user.crewId),
     getCrewMembers(user.crewId),
   ]);
+  const reacts = await getReactions(takes.map((t) => takeTarget(t.user.id, t.track.id)), user.id);
   const myScore = new Map(mine.map((m) => [m.track.id, m.r.score]));
   const friends = members.filter((m) => m.id !== user.id).map((m) => ({ ...m, ...(matches.get(m.id) ?? { match: null, shared: 0 }) }));
   friends.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
@@ -88,10 +91,13 @@ export default async function RatePage() {
                       {t.hot && <span className="hot-take">hot take</span>}
                     </p>
                     {t.note && <p className="take-note">&ldquo;{t.note}&rdquo;</p>}
-                    <p className="text-xs text-muted">
-                      {timeAgo(t.at.getTime())}
-                      {t.others.length > 0 && ` · group avg ${(t.others.reduce((s, o) => s + o.score, 0) / t.others.length).toFixed(1)}`}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted">
+                        {timeAgo(t.at.getTime())}
+                        {t.others.length > 0 && ` · group avg ${(t.others.reduce((s, o) => s + o.score, 0) / t.others.length).toFixed(1)}`}
+                      </span>
+                      <Reactions target={takeTarget(t.user.id, t.track.id)} initial={reacts[takeTarget(t.user.id, t.track.id)]} canReact={t.user.id !== user.id} size="sm" />
+                    </div>
                   </div>
                   {t.user.id !== user.id && <RateButton song={song(t.track)} score={myScore.get(t.track.id)} className="self-center" />}
                 </li>

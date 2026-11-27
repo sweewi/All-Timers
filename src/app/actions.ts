@@ -157,12 +157,19 @@ export async function stealSong(trackIdIn: string, fromUserIdIn: string) {
   return { ok: true as const, already: false };
 }
 
-/** Toggle one reaction (laurel, fire, cry, same) on a song or a batch of moves. */
+/** Toggle one reaction (laurel, fire, cry, same) on a song, a batch of moves, or a rating. */
 export async function toggleReaction(target: string, kind: string) {
   const user = await requireUser();
   await budget("write", user.id);
-  if (!/^(song|moves):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
+  if (!/^(song|moves|take):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
   const db = await getDb();
+  // only on things that belong to someone in one of this person's groups
+  const [type, a] = target.split(":");
+  const ownerId =
+    type === "moves"
+      ? (await db.select({ u: schema.rankEvents.userId }).from(schema.rankEvents).where(eq(schema.rankEvents.batchId, a)).limit(1))[0]?.u
+      : a;
+  if (!ownerId || ownerId === user.id || !(await shareAGroup(user.id, ownerId))) return { ok: false as const };
   const mine = and(
     eq(schema.reactions.userId, user.id),
     eq(schema.reactions.target, target),

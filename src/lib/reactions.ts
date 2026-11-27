@@ -7,6 +7,7 @@ export type ReactionCounts = Partial<Record<ReactionKind, { n: number; mine: boo
 
 export const songTarget = (ownerId: string, trackId: string) => `song:${ownerId}:${trackId}`;
 export const movesTarget = (batchId: string) => `moves:${batchId}`;
+export const takeTarget = (raterId: string, trackId: string) => `take:${raterId}:${trackId}`;
 
 /** Reaction counts for many targets in one query. */
 export async function getReactions(targets: string[], meId: string | null): Promise<Record<string, ReactionCounts>> {

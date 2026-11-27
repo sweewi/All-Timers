@@ -12,7 +12,7 @@ import { promenadeScreens } from "@/lib/promenade";
 import { Doors } from "@/components/Portal";
 import { StealButton } from "@/components/StealButton";
 import { getSocial } from "@/lib/social";
-import { getReactions, movesTarget } from "@/lib/reactions";
+import { getReactions, movesTarget, takeTarget } from "@/lib/reactions";
 import { Reactions, type Counts } from "@/components/Reactions";
 import { artistLine } from "@/lib/songs";
 import { carvedTitle } from "@/lib/monument";
@@ -47,7 +47,10 @@ export default async function Home() {
     freshTakes(user.crewId, 10),
   ]);
   const scoreIds = [...new Set([...social.shared.map((s) => s.track.id), ...rotation.map((r) => r.track.id), ...takes.map((t) => t.track.id)])];
-  const scored = await groupRatingsFor(user.crewId, scoreIds);
+  const [scored, takeReacts] = await Promise.all([
+    groupRatingsFor(user.crewId, scoreIds),
+    getReactions(takes.map((t) => takeTarget(t.user.id, t.track.id)), user.id),
+  ]);
   const myScore = (id: string) => scored.get(id)?.find((r) => r.userId === user.id)?.score ?? null;
   const rateable = (t: { id: string; name: string; artists: string; imageUrl: string | null }) => ({ id: t.id, name: carvedTitle(t.name), artists: artistLine(t.artists), imageUrl: t.imageUrl });
   const liveEnabled = [...accts.values()].some((a) => visibility(a).live);
@@ -137,7 +140,10 @@ export default async function Home() {
                         {timeAgo(t.at)}
                         {t.others.length > 0 && ` · ${t.others.map((o) => `${o.name} ${o.score.toFixed(1)}`).join(", ")}`}
                       </span>
-                      {t.user.id !== user.id && <RateButton song={rateable(t.track)} score={myScore(t.track.id)} />}
+                      <span className="flex items-center gap-2">
+                        <Reactions target={takeTarget(t.user.id, t.track.id)} initial={takeReacts[takeTarget(t.user.id, t.track.id)]} canReact={t.user.id !== user.id} size="sm" />
+                        {t.user.id !== user.id && <RateButton song={rateable(t.track)} score={myScore(t.track.id)} />}
+                      </span>
                     </div>
                   </div>
                 </div>
