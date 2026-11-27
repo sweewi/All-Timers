@@ -34,12 +34,14 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
       <Altitude base={0.3} range={0.25} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Link href={`/u/${user.handle}${kind === "on_deck" ? "?list=on_deck" : ""}`} className="text-sm text-muted">
-            ← Back to my list
+          <Link href={`/u/${user.handle}`} className="text-sm text-muted">
+            ← Back to your column
           </Link>
-          <h1 className="rank-num mt-1 text-5xl">Edit {kind === "on_deck" ? "On Deck" : "All-Time"}</h1>
+          <h1 className="rank-num mt-1 text-5xl">{kind === "on_deck" ? "On Deck" : "Your All-Timers"}</h1>
           <p className="mt-2 text-sm text-muted">
-            Drag to reorder, or type a new rank number. Open a song to say why it&apos;s here.
+            {kind === "on_deck"
+              ? "Songs knocking on the door. Drag to reorder; move one up to All-Time when it earns it."
+              : "Your list, in order. Drag to reorder, or type a new rank number. Open a song to say why it's here."}
           </p>
         </div>
         <div className="flex gap-2 text-sm">

@@ -6,8 +6,10 @@ import { getCrewFeed, getCrewOverview, type FeedItem } from "@/lib/lists";
 import { Art } from "@/components/track";
 import { ShareInvite } from "@/components/ShareInvite";
 import { Altitude } from "@/components/World";
-import { Grounds, type GroundMember } from "@/components/Grounds";
-import { Portal } from "@/components/Portal";
+import { type GroundMember } from "@/components/Grounds";
+import { Promenade } from "@/components/Promenade";
+import { promenadeScreens } from "@/lib/promenade";
+import { Doors } from "@/components/Portal";
 import { StealButton } from "@/components/StealButton";
 import { getSocial } from "@/lib/social";
 import { getReactions, movesTarget } from "@/lib/reactions";
@@ -41,28 +43,32 @@ export default async function Home() {
     isMe: member.id === user.id,
   }));
   const invite = `/join/${crew.inviteCode}`;
+  const ghosts = Math.max(0, 3 - members.length);
+  const walk = promenadeScreens(members.length + ghosts);
 
   return (
     <div className="home">
-      {/* scrolling down lifts you off the sand and up into the clouds */}
-      <Altitude stops={[{ y: 0, alt: 0 }, { y: 1, alt: 0.4 }, { y: "end", alt: 0.92 }]} />
-      <Grounds members={members} title={/all-timers$/i.test(crew.name) ? "All·Timers" : crew.name} ghosts={Math.max(0, 3 - members.length)} />
-
-      <section className="hero">
-        <p className="sticker sticker-blue -rotate-2">{crew.name}</p>
-        <h1 className="hero-line">
-          Hey {user.name.split(" ")[0]},
-          <br />
-          <em>{feed.length ? "the columns moved." : "pick a column."}</em>
-        </h1>
-        <p className="hero-sub">Tap anyone&apos;s column to climb it. Scroll to fly up.</p>
-        {mine && mine.count === 0 && (
-          <Link href="/me/import" className="sticker sticker-steal pointer-events-auto mt-4 inline-block rotate-1 text-base">
-            Raise your column →
-          </Link>
-        )}
+      {/* first you walk along the plaza, then scrolling lifts you off the sand into the sky */}
+      <Altitude stops={[{ y: 0, alt: 0 }, { y: walk, alt: 0 }, { y: walk + 1, alt: 0.3125 }, { y: "end", alt: 0.92 }]} />
+      <Promenade members={members} ghosts={ghosts}>
+        <div className="hero">
+          <p className="sticker sticker-blue -rotate-2">{crew.name}</p>
+          <h1 className="hero-line">
+            Which songs are
+            <br />
+            <em>your All-Timers?</em>
+          </h1>
+          <p className="hero-sub">
+            {members.length > 1 ? `${members.length} columns on the plaza. Tap one to climb it.` : "Your column is the first on the plaza. Bring friends."}
+          </p>
+          {mine && mine.count === 0 && (
+            <Link href="/me/import" className="sticker sticker-steal mt-4 inline-block rotate-1 text-base">
+              Raise your column →
+            </Link>
+          )}
+        </div>
         {feed.length > 0 && <Ticker items={feed.map(tickerLine)} />}
-      </section>
+      </Promenade>
 
       <div className="home-sections">
         <section>
@@ -145,12 +151,15 @@ export default async function Home() {
         <section id="invite">
           <h2 className="tall-h">Doors</h2>
           <p className="tall-sub">Every room in the place.</p>
-          <div className="doors">
-            <Portal href={`/u/${user.handle}`} label="Your column" sub={mine?.count ? `${mine.count} songs` : "raise it"} cover={mine?.top[0]?.imageUrl} tone="night" />
-            <Portal href="/compare" label="Compare" sub="you vs anyone" tone="dawn" inside={<span className="portal-word">VS</span>} />
-            <Portal href="/me/stories" label="The why room" sub="tell the stories" tone="sea" inside={<span className="portal-word">“ ”</span>} />
-            <Portal href="/me/import" label="Add songs" sub="from Spotify" tone="night" inside={<span className="portal-word">+</span>} />
-          </div>
+          <Doors
+            width={240}
+            doors={[
+              { href: `/u/${user.handle}`, label: "Your column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
+              { href: "/compare", label: "Compare", sub: "you vs anyone", tone: "dawn", inside: <span className="portal-word">VS</span> },
+              { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea", inside: <span className="portal-word">“ ”</span> },
+              { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night", inside: <span className="portal-word">+</span> },
+            ]}
+          />
           <div className="paper-note mt-10 max-w-xl">
             <b>Bring more people in.</b> Columns get interesting in a crowd.
             <div className="mt-3">

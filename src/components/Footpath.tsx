@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Portal } from "./Portal";
+import { Doors } from "./Portal";
 
 /**
  * The path out of every room: a row of doors on floating islands to the other rooms.
@@ -19,20 +19,11 @@ export function Footpath({ handle, cover }: { handle: string; cover?: string | n
   return (
     <section className="footpath" aria-label="Other rooms">
       <p className="footpath-k">Elsewhere in the place</p>
-      <div className="doors footpath-doors">
-        {doors.map((d) => (
-          <Portal
-            key={d.href}
-            href={d.href}
-            label={d.label}
-            sub={d.sub}
-            tone={d.tone}
-            width={170}
-            cover={d.cover}
-            inside={d.word ? <span className="portal-word">{d.word}</span> : undefined}
-          />
-        ))}
-      </div>
+      <Doors
+        className="footpath-doors"
+        width={190}
+        doors={doors.map((d) => ({ href: d.href, label: d.label, sub: d.sub, tone: d.tone, cover: d.cover, inside: d.word ? <span className="portal-word">{d.word}</span> : undefined }))}
+      />
     </section>
   );
 }

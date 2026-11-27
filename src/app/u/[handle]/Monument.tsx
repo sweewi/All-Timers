@@ -171,6 +171,10 @@ export function Monument({
   const baseP = PIECES[base];
   const skyPad = mobile ? 180 : 260;
   const m = PX_PER_M * s; // CSS pixels per meter
+  // the name stands just behind the frame: the frame covers only its feet
+  const giantPx = Math.min(viewW * (mobile ? 0.3 : Math.max(0.14, 0.92 / Math.max(3, person.name.length))), 300);
+  const frameTop = skyPad + ((crown.cover?.[1] ?? 0) - 0.13 * PX_PER_M) * s;
+  const giantStyle: React.CSSProperties = { top: frameTop - giantPx * 0.66, fontSize: giantPx };
   // the overlap strip: each piece fades in over the bottom of the one above it
   const fadeTop = (ov: number): React.CSSProperties => {
     const g = `linear-gradient(to bottom, transparent 0, #000 ${ov * s}px)`;
@@ -191,7 +195,7 @@ export function Monument({
           {toolbar && <div className="mt-4 flex flex-wrap justify-center gap-2">{toolbar}</div>}
         </header>
         {/* the name, huge, behind the top of the column */}
-        <h1 className="mon-giant" style={{ top: skyPad - (mobile ? 30 : 70), fontSize: mobile ? "34vw" : `min(${Math.max(14, 92 / Math.max(3, person.name.length))}vw, 300px)` }}>
+        <h1 className="mon-giant" style={giantStyle}>
           {person.name}
         </h1>
 

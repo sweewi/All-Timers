@@ -19,7 +19,8 @@ export type Stop = { y: number | "end"; back?: number; alt: number };
 let arrived = false;
 
 export function Altitude({ stops, base = 0.3, range = 0 }: { stops?: Stop[]; base?: number; range?: number }) {
-  const key = JSON.stringify(stops ?? [{ y: 0, alt: base }, { y: "end", alt: base + range }]);
+  // a room drifts by `range` over six screens, so a short page barely moves the sky
+  const key = JSON.stringify(stops ?? [{ y: 0, alt: base }, { y: 6, alt: base + range }]);
   useEffect(() => {
     const path: Stop[] = JSON.parse(key);
     const root = document.documentElement;
@@ -142,7 +143,7 @@ export function World() {
         ))}
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={A("plate")} alt="" className="world-ground" />
+      <img src={A("plate2")} alt="" className="world-ground" />
     </div>
     {/* one finishing pass over everything, so renders and photographs read as one picture */}
     <div className="world-finish" aria-hidden>

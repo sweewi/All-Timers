@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -79,7 +79,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       steal: !isMe && !social.has(e.track),
       reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
     }));
-    const btn = "mon-btn";
+    const btn = "sticker sticker-paper sticker-lg";
     return (
       <Monument
         person={{ id: person.id, name: person.name, handle: person.handle, color: person.color }}
@@ -89,11 +89,15 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         storyHref={`/me/stories?list=all_time`}
         toolbar={
           <>
-            <Link href={`/u/${handle}?view=list`} className={btn}>List view</Link>
-            {onDeck.length > 0 && <Link href={`/u/${handle}?list=on_deck`} className={btn}>On Deck ({onDeck.length})</Link>}
-            {isMe ? (
-              <Link href="/me/edit" className={btn}>Reorder</Link>
-            ) : (
+            <Link href={isMe ? "/me/edit" : `/u/${handle}?view=list`} className={btn}>
+              {isMe ? "List & reorder" : "List view"}
+            </Link>
+            {onDeck.length > 0 && (
+              <Link href={isMe ? "/me/edit?list=on_deck" : `/u/${handle}?list=on_deck`} className={btn}>
+                On Deck ({onDeck.length})
+              </Link>
+            )}
+            {isMe ? null : (
               <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className={btn}>Compare with me</Link>
             )}
           </>
@@ -101,6 +105,8 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       />
     );
   }
+  // your own list as a list is the editable one: one place to read it and reorder it
+  if (isMe) redirect(`/me/edit${kind === "on_deck" ? "?list=on_deck" : ""}`);
   const entries = kind === "on_deck" ? onDeck : allTime;
   const putOns = allTime.filter((e) => e.origin?.fromUser).length;
   const withStory = allTime.filter((e) => hasStory(e.origin)).length;
