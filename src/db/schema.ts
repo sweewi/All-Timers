@@ -351,6 +351,8 @@ export const spotifyMirrors = pgTable("spotify_mirrors", {
   playlistId: text("playlist_id").notNull(),
   url: text("url").notNull(),
   snapshotId: text("snapshot_id"),
+  /** hash of the track order + phase last pushed, so unchanged syncs cost nothing */
+  contentHash: text("content_hash"),
   syncedAt: timestamp("synced_at", { withTimezone: true }),
   lastError: text("last_error"),
 });

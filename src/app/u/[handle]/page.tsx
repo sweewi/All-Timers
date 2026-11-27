@@ -17,7 +17,6 @@ import { getCrewOverview } from "@/lib/lists";
 import { Altitude } from "@/components/World";
 import { getReactions, songTarget } from "@/lib/reactions";
 import { getPlays, refreshListening } from "@/lib/listening";
-import { getMirror } from "@/lib/mirror";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -50,12 +49,11 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   // The monument is the default way to see an all-time list; ?view=list is the plain list.
   if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
-    const [social, overview, reacts, plays, mirror] = await Promise.all([
+    const [social, overview, reacts, plays] = await Promise.all([
       getSocial(viewer.crewId, viewer.id),
       getCrewOverview(viewer.crewId),
       getReactions(allTime.map((e) => songTarget(person.id, e.track.id)), viewer.id),
       getPlays(person.id, allTime.map((e) => e.track.id)),
-      getMirror(`column:${person.id}`),
     ]);
     // stale numbers are refreshed after the page is sent; the next visit sees them
     after(() => refreshListening(person.id));
@@ -126,11 +124,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
             {isMe ? null : (
               <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className={btn}>Compare with me</Link>
             )}
-            {mirror?.url && (
-              <a href={mirror.url} target="_blank" rel="noopener noreferrer" className={btn}>
-                ▶ Play on Spotify
-              </a>
-            )}
+
           </>
         }
       />

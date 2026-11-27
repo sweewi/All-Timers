@@ -52,8 +52,16 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="font-medium">Paste your playlist&apos;s link</div>
         <p className="mt-1 text-sm text-muted">
-          In Spotify, open the playlist → ••• (or Share) → <b>Copy link to playlist</b>. Works from your phone. The playlist must be public.
+          In Spotify, open the playlist → ••• (or Share) → <b>Copy link to playlist</b>. Works from your phone.
         </p>
+        <details className="mt-2 text-sm text-muted">
+          <summary className="cursor-pointer">The playlist has to be public. How do I check?</summary>
+          <p className="mt-1">
+            Spotify only shows public playlists to anyone outside your account. On your phone: open the playlist → ••• → if you see{" "}
+            <b>Make public</b>, tap it. (If it says <b>Make private</b>, it&apos;s already public.) You can make it private again
+            after importing; your list here stays.
+          </p>
+        </details>
         <form
           className="mt-3 flex flex-wrap gap-2"
           onSubmit={(e) => {

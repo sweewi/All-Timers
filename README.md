@@ -33,7 +33,7 @@ With no `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite` (create
    - API: **Web API**.
    - In Vercel → Settings → Environment Variables add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`, then redeploy.
 4. **Open the site**, create the crew (you become admin), and import your list.
-5. **Settings → Connect my Spotify** (admin, optional). Your account becomes the group's playlist hub: every column and every finished month is kept as a playlist there, in order, that anyone can follow. Spotify's development mode allows only 5 signed-in users per app, which is why the hub is one account rather than everyone's.
+5. **The hub account (optional, for the monthly playlist).** Make a separate free Spotify account for the group (e.g. "All-Timers"; sign up with email, not "Continue with Google/Apple", so it isn't tied to yours). In the Spotify developer dashboard → your app → **User Management**, add the hub account's email. Then, in a private browser window logged into Spotify *as the hub*, open the site → **Settings → Connect the hub account**. Each month's playlist lives there: created once the pool has songs, growing with it, reordered into the final ranking at the reveal. Only the developer (you) needs Premium; the hub can be free. Spotify's development mode allows 5 signed-in accounts per app, which is why it's one hub rather than everyone's own.
 6. **Cron secret.** Add `CRON_SECRET` (any random string of 16+ characters, e.g. `openssl rand -hex 24`). Vercel sends it to `/api/cron/daily` once a day (see `vercel.json`); without it the route refuses every call.
 7. **Settings → Refresh song details** if you imported songs before adding the Spotify keys.
 8. Copy the invite link from the home page and send it to the group.
@@ -57,7 +57,7 @@ Members can link their [stats.fm](https://stats.fm) profile in Settings (usernam
 - the plaza shows who's playing what right now (polled about once a minute while the page is open)
 - **On repeat**: everyone's most-played of the last four weeks, stealable
 - **You keep playing these**: songs you replay that aren't on your lists, on the On Deck page
-- **The monthly list** (`/month`): each person's top 5 by plays in the calendar month (weighted so everyone counts equally) plus up to 3 nominations each; everyone ranks a secret ballot; the group list is revealed at 8 pm on the last day (averaged Borda count) and mirrored to the Spotify hub
+- **The monthly list** (`/month`): each person's top 5 by plays in the calendar month (weighted so everyone counts equally) plus up to 3 nominations each; everyone ranks a secret ballot; the group list is revealed at 8 pm on the last day (averaged Borda count). With a hub account connected, the month has a Spotify playlist everyone can save: the pool while voting is open, the final order after the reveal. Each pool card also has a quick-listen player (full songs if you're logged into Spotify in that browser, otherwise 30-second previews)
 
 Being a good guest to an unofficial API: requests are throttled (2 at a time), cached (4 h to 24 h depending on the data), refreshed after pages render rather than during, backed off on 429, and the site works without it.
 
@@ -79,7 +79,7 @@ PGLITE_DIR=/tmp/scratch node --conditions=react-server --import tsx scripts/smok
 
 - `src/db/schema.ts`: tables (crews, users, sessions, tracks, list_entries, origins, rank_events, reactions, settings, statsfm_accounts, listen_tops, listen_syncs, now_playing, monthly_rounds/pool/ballots/results, rate_limits, spotify_mirrors)
 - `src/lib/net.ts` · `guard.ts` · `ratelimit.ts`: the safety layer
-- `src/lib/statsfm.ts` (client) · `listening.ts` (cache + sync) · `monthly-math.ts` (pure) · `monthly.ts` (rounds) · `mirror.ts` (Spotify hub) · `playlist.ts` (one-link import)
+- `src/lib/statsfm.ts` (client) · `listening.ts` (cache + sync) · `monthly-math.ts` (pure) · `monthly.ts` (rounds) · `mirror.ts` (monthly playlist on the hub account) · `playlist.ts` (one-link import)
 - `src/lib/spotify.ts`: link parsing, track lookups (Spotify API if keys work, plus Spotify's public song pages; oEmbed last), and a backfill that heals title-only songs after pages load
 - `src/lib/lists.ts`: reading and saving lists, change log, crew overview and feed
 - `src/lib/songs.ts`: version and song identity (ISRC vs title + artist)

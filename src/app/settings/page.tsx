@@ -94,12 +94,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             ) : (
               <>
                 <p className="text-sm text-muted">
-                  Song lookups use the app&apos;s Spotify keys. Connecting your own account makes it the group&apos;s playlist hub:
-                  every column and every finished month becomes a playlist on your account, kept in order, that anyone can follow.
+                  Connect the group&apos;s <b>hub</b> Spotify account here, not your personal one. Each month&apos;s playlist lives on
+                  it: created once the pool has songs, growing as it grows, and reordered into the group&apos;s ranking at the reveal.
+                  Everyone saves it from the This month page. Tip: log into Spotify as the hub account in a private window, then
+                  open this page in that same window and connect.
                 </p>
                 <div className="flex items-center gap-3">
                   <a href="/api/spotify/login" className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent">
-                    {spotifyConnected ? "Reconnect Spotify" : "Connect my Spotify"}
+                    {spotifyConnected ? "Reconnect the hub account" : "Connect the hub account"}
                   </a>
                   {spotifyConnected && <span className="text-sm text-green-700">Connected</span>}
                   {sp.spotify === "error" && <span className="text-sm text-red-700">That didn&apos;t work. Try again.</span>}
@@ -107,7 +109,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 {spotifyConnected && (
                   <div className="flex items-center gap-3 pt-2">
                     <ActionButton run={syncSpotifyMirrors} label="Sync playlists now" />
-                    <span className="text-xs text-muted">They also sync on every save and once a day.</span>
+                    <span className="text-xs text-muted">It also syncs whenever the pool changes and once a day.</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3 pt-2">

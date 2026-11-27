@@ -47,11 +47,11 @@ export async function fetchPlaylist(id: string): Promise<Playlist> {
   try {
     embed = (await safeFetchText(`https://open.spotify.com/embed/playlist/${id}`, { headers: LINK_PREVIEW, retries: 1 })).text;
   } catch (e) {
-    if (e instanceof NetError && e.status === 404) throw new PlaylistError("Spotify can't find that playlist. Is it public?");
+    if (e instanceof NetError && e.status === 404) throw new PlaylistError("Spotify can't find that playlist. It may be private: in Spotify, open it → ••• → Make public, then try again.");
     throw new PlaylistError("Spotify didn't answer. Try again in a minute.");
   }
   const m = embed.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (!m) throw new PlaylistError("Couldn't read that playlist. Is it public?");
+  if (!m) throw new PlaylistError("Couldn't read that playlist. If it's private, open it in Spotify → ••• → Make public, then try again.");
   let raw: unknown;
   try {
     raw = (JSON.parse(m[1]) as { props?: { pageProps?: { state?: { data?: { entity?: unknown } } } } })?.props?.pageProps?.state?.data?.entity;

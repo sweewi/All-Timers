@@ -1,0 +1,1 @@
+ALTER TABLE "spotify_mirrors" ADD COLUMN "content_hash" text;

@@ -25,7 +25,7 @@ import { carvedTitle, roman } from "@/lib/monument";
 import { timeLeft } from "@/lib/time";
 import { APP_TZ } from "@/lib/listening";
 import { Altitude } from "@/components/World";
-import { hubConnected, mirrorMonth } from "@/lib/mirror";
+import { queueMonthMirror, syncMonth } from "@/lib/mirror";
 import { Ballot, type PoolCard } from "./Ballot";
 import { NominateForm } from "./NominateForm";
 
@@ -37,19 +37,20 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
   if (!round) return <NotYet past />;
   const wasOpen = round.status === "open";
   round = await revealIfDue(round);
-  if (wasOpen && round.status === "revealed") {
-    const r = round;
-    after(async () => {
-      if (await hubConnected()) await mirrorMonth(r);
-    });
-  }
+  // the month's playlist reorders into the final ranking at the reveal
+  if (wasOpen && round.status === "revealed") queueMonthMirror(round.id);
 
   // the first look at a month builds its pool right away; after that it grows in the background
   if (round.status === "open") {
-    if (!round.poolBuiltAt) await refreshPool(round);
-    else if (poolIsStale(round)) {
+    if (!round.poolBuiltAt) {
+      await refreshPool(round);
+      queueMonthMirror(round.id);
+    } else if (poolIsStale(round)) {
       const r = round;
-      after(() => refreshPool(r));
+      after(async () => {
+        await refreshPool(r);
+        await syncMonth(r.id); // unchanged songs cost nothing
+      });
     }
   }
 
@@ -111,12 +112,17 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
               {m.id === viewer.id ? "You" : m.name}
             </span>
           ))}
-          {playlistUrl && (
-            <a href={playlistUrl} target="_blank" rel="noopener noreferrer" className="sticker sticker-paper">
-              ▶ Spotify playlist
-            </a>
-          )}
         </div>
+        {playlistUrl && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <a href={playlistUrl} target="_blank" rel="noopener noreferrer" className="sticker sticker-steal sticker-lg -rotate-1">
+              ▶ Save this month&apos;s playlist on Spotify
+            </a>
+            <span className="text-sm text-white/85">
+              {phase === "revealed" ? "Now in the group's final order." : "Listen through it, then rank below. It grows as the pool does."}
+            </span>
+          </div>
+        )}
       </header>
 
       {phase === "revealed" ? (

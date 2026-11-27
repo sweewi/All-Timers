@@ -9,7 +9,6 @@ import { saveList } from "@/lib/lists";
 import { backfillTracks, parseTrackInput, resolveTracks } from "@/lib/spotify";
 import { fetchPlaylist, parsePlaylistInput, PlaylistError, savePlaylistTracks } from "@/lib/playlist";
 import { RateLimited } from "@/lib/ratelimit";
-import { queueColumnMirror } from "@/lib/mirror";
 import { artistLine } from "@/lib/songs";
 import { budget, parse, zKind, zTrackIds } from "@/lib/guard";
 import { z } from "zod";
@@ -132,6 +131,5 @@ export async function saveImport(kindIn: ListKind, idsIn: string[], modeIn: "rep
   const exists = new Set([...known, ...missing]);
   await saveList(user.id, kind, order.filter((id) => exists.has(id)));
   after(() => backfillTracks(120));
-  if (kind === "all_time") queueColumnMirror(user.id);
   return { handle: user.handle };
 }

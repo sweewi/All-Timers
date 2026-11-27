@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
       await refreshPool(cur);
       return { current: now, checkedPrev: prev };
     });
+    // after the pools and reveals above, so playlists reflect today's state
     await step(`mirror:${c.id}`, () => mirrorCrew(c.id));
   }
   await step("sweep", sweepOldListening);

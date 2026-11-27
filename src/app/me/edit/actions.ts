@@ -8,7 +8,6 @@ import { requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId } from "@/lib/ids";
 import { hasListened } from "@/lib/listening";
-import { queueColumnMirror } from "@/lib/mirror";
 import { budget, parse, zId, zKind, zTrackId, zTrackIds } from "@/lib/guard";
 import { z } from "zod";
 
@@ -21,7 +20,6 @@ export async function saveOrder(kindIn: ListKind, idsIn: string[]) {
   const mine = new Set([...(await getList(user.id, "all_time")), ...(await getList(user.id, "on_deck"))].map((e) => e.track.id));
   if (ids.some((id) => !mine.has(id))) throw new Error("Unknown song in that order.");
   await saveList(user.id, kind, ids);
-  if (kind === "all_time") queueColumnMirror(user.id);
   refresh();
 }
 
@@ -42,7 +40,6 @@ export async function moveToList(trackIdIn: string, fromIn: ListKind, toIn: List
     from,
     src.map((e) => e.track.id).filter((id) => id !== trackId),
   );
-  queueColumnMirror(user.id);
   refresh();
 }
 

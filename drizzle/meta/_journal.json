@@ -29,6 +29,13 @@
       "when": 1795743297134,
       "tag": "0003_listening_monthly_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795746486517,
+      "tag": "0004_mirror_content_hash",
+      "breakpoints": true
     }
   ]
 }

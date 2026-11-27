@@ -92,7 +92,7 @@ export async function refreshStatsfmNow(): Promise<string> {
   return r.refreshed.length ? "Up to date" : "stats.fm didn't answer. We'll try again later.";
 }
 
-/** Admin only: push every column and finished month to the Spotify hub now. */
+/** Admin only: push every month's playlist to the Spotify hub now. */
 export async function syncSpotifyMirrors(): Promise<string> {
   const admin = await requireUser();
   if (!admin.isAdmin) throw new Error("Not allowed");

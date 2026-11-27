@@ -8,6 +8,7 @@ import { getRound, MonthlyError, nominate, saveBallot, withdrawNomination } from
 import { RateLimited } from "@/lib/ratelimit";
 import { parseTrackInput, resolveTracks } from "@/lib/spotify";
 import { z } from "zod";
+import { queueMonthMirror } from "@/lib/mirror";
 
 export type MonthResult = { ok: true; message?: string } | { ok: false; message: string };
 
@@ -52,6 +53,7 @@ export async function nominateAction(month: string, input: string): Promise<Mont
     const [track] = await resolveTracks([id]);
     if (!track) return { ok: false, message: "Couldn't find that song on Spotify." };
     await nominate(round, user.id, track.id);
+    queueMonthMirror(round.id);
     refresh();
     return { ok: true, message: `${track.name} is in the pool.` };
   });
@@ -62,6 +64,7 @@ export async function withdrawAction(month: string, trackId: string): Promise<Mo
     const id = parse(zTrackId, trackId);
     const { user, round } = await openRound(month);
     await withdrawNomination(round, user.id, id);
+    queueMonthMirror(round.id);
     refresh();
     return { ok: true };
   });

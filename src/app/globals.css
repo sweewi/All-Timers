@@ -800,3 +800,21 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
   .pool-card b { font-size: 15px; }
   .pool-card .sticker { font-size: 9.5px; white-space: normal; }
 }
+.pool-card { position: relative; }
+.pool-play {
+  position: absolute; left: 16px; top: 16px;
+  width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center;
+  background: rgba(20, 30, 90, 0.78); color: #fff; font-size: 13px; backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1);
+}
+.pool-play:hover { transform: scale(1.1); }
+.pool-play.is-on { background: #1db954; }
+.quick-listen {
+  position: fixed; left: 50%; bottom: 14px; translate: -50% 0; z-index: 60;
+  width: min(560px, calc(100vw - 24px)); display: flex; align-items: center; gap: 6px;
+  padding: 6px; border-radius: 16px; background: var(--paper);
+  box-shadow: 0 20px 50px -14px rgba(10, 20, 80, 0.7), 0 0 0 2px #fff;
+}
+.quick-listen iframe { border-radius: 12px; flex: 1; border: 0; }
+.quick-listen button { width: 32px; height: 32px; font-size: 20px; color: #8a7f6d; }
+.quick-listen button:hover { color: #b3261e; }
