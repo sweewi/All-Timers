@@ -63,7 +63,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <h1 className="rank-num text-5xl">Settings</h1>
 
       <section className="space-y-3">
-        <h2 className="font-medium">Your other devices</h2>
+        <h2 className="font-medium">Sign in on another device</h2>
         <p className="text-sm text-muted">
           There are no passwords. To use the site on your phone or laptop, make a link here and open it there. It signs in as{" "}
           <b>you</b>, so keep it to yourself.
@@ -77,7 +77,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </section>
 
       <section className="space-y-3" id="groups">
-        <h2 className="font-medium">Your groups</h2>
+        <h2 className="font-medium">Groups</h2>
         <p className="text-sm text-muted">
           Your All-Timers list is the same in every group; each group has its own plaza, feed and monthly list.
         </p>
@@ -90,9 +90,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               required
               maxLength={60}
               placeholder="e.g. Roommates' All-Timers"
-              className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 outline-none focus:border-accent"
+              className="field"
             />
-            <button className="rounded-full border border-line px-4 py-2 hover:border-accent">Create</button>
+            <button className="btn btn-marble btn-sm">Create</button>
           </form>
           <p className="mt-1 text-xs text-muted">You&apos;ll be its admin, then invite people with its own link.</p>
         </details>
@@ -152,7 +152,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   open this page in that same window and connect.
                 </p>
                 <div className="flex items-center gap-3">
-                  <a href="/api/spotify/login" className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent">
+                  <a href="/api/spotify/login" className="btn btn-marble btn-sm">
                     {spotifyConnected ? "Reconnect the hub account" : "Connect the hub account"}
                   </a>
                   {spotifyConnected && <span className="text-sm text-green-700">Connected</span>}

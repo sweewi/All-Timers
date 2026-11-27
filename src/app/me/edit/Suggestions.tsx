@@ -6,7 +6,7 @@ import { addFromListening } from "./actions";
 
 export type Suggestion = { id: string; name: string; artists: string; imageUrl: string | null; streams: number | null; recent: boolean };
 
-/** "You keep playing these": recent heavy rotation that isn't on either list yet. */
+/** "On repeat lately": recent heavy rotation that isn't on either list yet. */
 export function Suggestions({ items, linked }: { items: Suggestion[]; linked: boolean }) {
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [pending, start] = useTransition();
@@ -21,7 +21,7 @@ export function Suggestions({ items, linked }: { items: Suggestion[]; linked: bo
   if (!items.length) return null;
   return (
     <section className="mt-12">
-      <h2 className="rank-num text-3xl">You keep playing these</h2>
+      <h2 className="rank-num text-3xl">On repeat lately, not on a list yet</h2>
       <p className="mt-1 text-sm text-muted">Heavy rotation that isn&apos;t on either list. Knocking on the door?</p>
       <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-background/80">
         {items.map((s) => (
@@ -58,7 +58,7 @@ export function Suggestions({ items, linked }: { items: Suggestion[]; linked: bo
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-muted">From your stats.fm.</p>
+      <p className="mt-2 text-xs text-muted">From stats.fm.</p>
     </section>
   );
 }

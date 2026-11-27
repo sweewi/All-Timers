@@ -210,7 +210,7 @@ export function Monument({
 
         <header className="relative z-[3] pt-10 text-center" style={{ height: skyPad }}>
           <p className="sticker sticker-blue -rotate-2">
-            {isMe ? "Your all-timers" : `${person.name}'s all-timers`} · {songs.length} {songs.length === 1 ? "song" : "songs"}
+            {isMe ? "My all-timers" : `${person.name}'s all-timers`} · {songs.length} {songs.length === 1 ? "song" : "songs"}
           </p>
           {toolbar && <div className="mt-4 flex flex-wrap justify-center gap-2">{toolbar}</div>}
           {receipts && (receipts.streams != null || receipts.mostPlayed || receipts.topIsMost) && (

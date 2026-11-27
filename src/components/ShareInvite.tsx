@@ -18,19 +18,19 @@ export function ShareInvite({ path, groupName }: { path: string; groupName: stri
     setCopied(what);
     setTimeout(() => setCopied(null), 1800);
   };
-  const btn = "rounded-full border border-line px-4 py-2 text-sm hover:border-accent hover:text-accent";
+  const btn = "btn btn-marble btn-sm";
   return (
     <div className="flex flex-wrap gap-2">
       {canShare && (
         <button
           type="button"
           onClick={() => navigator.share({ text: message() }).catch(() => {})}
-          className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black"
+          className="btn btn-gold btn-sm"
         >
           Share invite
         </button>
       )}
-      <button type="button" onClick={() => copy("message")} className={canShare ? btn : "rounded-full bg-accent px-4 py-2 text-sm font-medium text-black"}>
+      <button type="button" onClick={() => copy("message")} className={canShare ? btn : "btn btn-gold btn-sm"}>
         {copied === "message" ? "Copied" : "Copy invite message"}
       </button>
       <button type="button" onClick={() => copy("link")} className={btn}>

@@ -11,9 +11,9 @@ export function Footpath({ handle, cover }: { handle: string; cover?: string | n
   const path = usePathname();
   const doors = [
     { href: "/", label: "The plaza", sub: "everyone's columns", tone: "dawn" as const, word: "✦" },
-    { href: `/u/${handle}`, label: "Your column", sub: "climb it", tone: "night" as const, cover },
+    { href: `/u/${handle}`, label: "My column", sub: "climb it", tone: "night" as const, cover },
     { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea" as const, word: "♪" },
-    { href: "/compare", label: "Compare", sub: "you vs anyone", tone: "dawn" as const, word: "VS" },
+    { href: "/compare", label: "Compare", sub: "any two of us", tone: "dawn" as const, word: "VS" },
     { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea" as const, word: "“ ”" },
     { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night" as const, word: "+" },
   ].filter((d) => d.href !== path);

@@ -74,7 +74,7 @@ export default async function Home() {
             <em>your All-Timers?</em>
           </h1>
           <p className="hero-sub">
-            {members.length > 1 ? `${members.length} columns on the plaza. Tap one to climb it.` : "Your column is the first on the plaza. Bring friends."}
+            {members.length > 1 ? `${members.length} columns on the plaza. Tap one to climb it.` : "The plaza fills up as friends join. Send them the invite."}
           </p>
           {mine && mine.count === 0 && (
             <Link href="/me/import" className="sticker sticker-steal mt-4 inline-block rotate-1 text-base">
@@ -124,7 +124,7 @@ export default async function Home() {
                   <span className="mt-2 flex flex-wrap justify-center gap-1">
                     {sh.holders.map((h) => (
                       <Link key={h.user.id} href={`/u/${h.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: h.user.color }}>
-                        {h.user.id === user.id ? "You" : h.user.name} #{h.rank}
+                        {h.user.name} #{h.rank}
                       </Link>
                     ))}
                   </span>
@@ -140,7 +140,7 @@ export default async function Home() {
           </h2>
           <p className="tall-sub">Their all-timers you don&apos;t have yet. Steal one and it lands in your On Deck, credited to them.</p>
           {social.picks.length === 0 ? (
-            <p className="paper-note">{overview.length < 2 ? "Once friends add their lists, their best songs show up here." : "You already have everything your friends love. Suspicious."}</p>
+            <p className="paper-note">{overview.length < 2 ? "Once friends add their lists, their best songs show up here." : "Every friend's favorite is already on a list here. Suspicious."}</p>
           ) : (
             <div className="rail">
               {social.picks.map((pk, i) => (
@@ -188,7 +188,7 @@ export default async function Home() {
                     <small>{artistLine(r.track.artists)}</small>
                     <span className="mt-2 flex flex-wrap items-center gap-1">
                       <Link href={`/u/${r.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: r.user.color }}>
-                        {mineToo ? "You" : r.user.name}
+                        {r.user.name}
                       </Link>
                       <span className="sticker sticker-paper">{r.streams != null ? `${compact(r.streams)} plays` : `their #${r.position} lately`}</span>
                     </span>
@@ -215,9 +215,9 @@ export default async function Home() {
           <Doors
             width={240}
             doors={[
-              { href: `/u/${user.handle}`, label: "Your column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
+              { href: `/u/${user.handle}`, label: "My column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
               { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea", inside: <span className="portal-word">♪</span> },
-              { href: "/compare", label: "Compare", sub: "you vs anyone", tone: "dawn", inside: <span className="portal-word">VS</span> },
+              { href: "/compare", label: "Compare", sub: "any two of us", tone: "dawn", inside: <span className="portal-word">VS</span> },
               { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea", inside: <span className="portal-word">“ ”</span> },
               { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night", inside: <span className="portal-word">+</span> },
             ]}
@@ -372,7 +372,7 @@ async function SignedOut() {
               className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2"
             />
           </label>
-          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">Start</button>
+          <button className="btn btn-gold">Start</button>
         </form>
       )}
     </div>

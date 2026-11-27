@@ -23,9 +23,9 @@ export function RenameGroup({ current }: { current: string }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={60}
-        className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 text-sm outline-none focus:border-accent"
+        className="field"
       />
-      <button disabled={pending || !changed} className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent disabled:opacity-40">
+      <button disabled={pending || !changed} className="btn btn-marble btn-sm">
         {pending ? "Saving…" : "Rename"}
       </button>
       {msg && <span className={`w-full text-xs ${msg.ok ? "text-green-700" : "text-red-700"}`}>{msg.text}</span>}

@@ -97,12 +97,12 @@ export function Grounds({
               <span className="mini-label" style={{ top: `${((mini.ground / mini.h) * 100).toFixed(2)}%` }}>
                 {m ? (
                   <>
-                    <b style={{ ["--c" as string]: m.color }}>{m.isMe ? "You" : m.name}</b>
+                    <b style={{ ["--c" as string]: m.color }}>{m.name}</b>
                     <small>{m.count ? `${m.count} songs` : "no list yet"}</small>
                   </>
                 ) : (
                   <>
-                    <b>Your friend</b>
+                    <b>A friend</b>
                     <small>invite them</small>
                   </>
                 )}

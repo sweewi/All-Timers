@@ -901,3 +901,162 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
 .group-menu button { text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 15px; color: #2f281e; }
 .group-menu button:hover:not(:disabled) { background: #efe7d6; }
 .group-menu button.is-current { color: #8a7f6d; }
+
+/* =============================================================================
+   Buttons and notes, made of the world's materials.
+   .btn-gold    primary: gold leaf, embossed label, a lip that presses in
+   .btn-marble  secondary: polished stone, same press
+   .btn-danger  destructive: oxblood lacquer
+   .note        taped paper; .note-amber / .note-blue / .note-red set the wax seal
+   ========================================================================== */
+.btn {
+  --lip: 4px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  padding: 0.62em 1.25em calc(0.62em - 1px);
+  border-radius: 999px;
+  font-family: var(--font-garamond), serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transform: translateY(0);
+  transition: transform 0.09s ease-out, box-shadow 0.09s ease-out, filter 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.04) saturate(1.05); }
+.btn:active:not(:disabled) { transform: translateY(calc(var(--lip) - 1px)); }
+.btn:focus-visible { outline: 3px solid #2a48c9; outline-offset: 3px; }
+.btn:disabled { cursor: default; filter: grayscale(0.45) opacity(0.55); }
+.btn-sm { font-size: 14px; --lip: 3px; padding: 0.5em 1em calc(0.5em - 1px); }
+.btn-lg { font-size: 18px; --lip: 5px; padding: 0.72em 1.5em calc(0.72em - 1px); }
+
+.btn-gold {
+  color: #3b2a0c;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 46%),
+    linear-gradient(100deg, #b8892f 0%, #ecc96a 22%, #fff0b8 34%, #d6a948 48%, #b07f24 70%, #e4bf62 88%, #a87a22 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 225, 0.9),
+    inset 0 -2px 3px rgba(110, 70, 10, 0.35),
+    0 var(--lip) 0 #6e4f18,
+    0 calc(var(--lip) + 6px) 14px -6px rgba(40, 25, 0, 0.55);
+}
+.btn-gold:active:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 250, 225, 0.8), inset 0 -1px 2px rgba(110, 70, 10, 0.3), 0 1px 0 #6e4f18, 0 3px 6px -3px rgba(40, 25, 0, 0.5);
+}
+
+.btn-marble {
+  color: #2f281e;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 50%),
+    radial-gradient(120% 80% at 18% 10%, transparent 58%, rgba(150, 140, 125, 0.18) 59%, transparent 61%),
+    radial-gradient(90% 120% at 85% 90%, transparent 64%, rgba(150, 140, 125, 0.14) 65%, transparent 67%),
+    linear-gradient(170deg, #fdfbf6, #ece5d6);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 0 0 1px rgba(170, 155, 125, 0.45),
+    0 var(--lip) 0 #b9ac93,
+    0 calc(var(--lip) + 6px) 14px -7px rgba(30, 30, 60, 0.45);
+}
+.btn-marble:active:not(:disabled) { box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px rgba(170, 155, 125, 0.5), 0 1px 0 #b9ac93, 0 3px 6px -3px rgba(30, 30, 60, 0.4); }
+
+.btn-danger {
+  color: #fff4ee;
+  text-shadow: 0 -1px 0 rgba(60, 0, 0, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 50%), linear-gradient(160deg, #a3271c, #6d130d);
+  box-shadow: inset 0 1px 0 rgba(255, 200, 190, 0.6), 0 var(--lip) 0 #4a0b06, 0 calc(var(--lip) + 6px) 14px -6px rgba(60, 0, 0, 0.5);
+}
+.btn-danger:active:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 200, 190, 0.5), 0 1px 0 #4a0b06; }
+
+.btn-link {
+  color: #7a5a1e;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  background: none;
+}
+.btn-link:hover { color: #a2432f; }
+
+/* text fields that sit next to these buttons */
+.field {
+  min-width: 0;
+  flex: 1;
+  padding: 0.62em 1.1em;
+  border-radius: 999px;
+  background: #fffdf8;
+  border: 1px solid #d8ccb2;
+  box-shadow: inset 0 2px 4px rgba(90, 70, 40, 0.12);
+  font-size: 15px;
+  color: #2f281e;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field:focus { border-color: #b8913f; box-shadow: inset 0 2px 4px rgba(90, 70, 40, 0.1), 0 0 0 3px rgba(184, 145, 63, 0.25); }
+
+/* taped paper notes with a wax seal */
+.note {
+  position: relative;
+  padding: 14px 18px 14px 44px;
+  background: linear-gradient(180deg, #fffdf6, #f7f0e0);
+  color: #3d3427;
+  border-radius: 2px;
+  font-size: 15px;
+  line-height: 1.5;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 14px 28px -18px rgba(30, 30, 70, 0.55), 0 2px 4px -2px rgba(60, 40, 10, 0.2);
+  rotate: -0.35deg;
+}
+.note::before {
+  /* tape */
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 84px;
+  height: 20px;
+  translate: -50% 0;
+  rotate: 2deg;
+  background: rgba(244, 233, 200, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 48%);
+}
+.note::after {
+  /* wax seal */
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), transparent 45%), var(--seal, #b8913f);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--seal, #b8913f) 60%, #000 10%), 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+.note-amber { --seal: #c98a1c; }
+.note-blue { --seal: #2a48c9; }
+.note-red { --seal: #a3271c; }
+.note-green { --seal: #2f8f5b; }
+.note > * + * { margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+/* the older paper notes get the same tape */
+.paper-note { position: relative; }
+.paper-note::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: 28px;
+  width: 70px;
+  height: 18px;
+  rotate: -3deg;
+  background: rgba(244, 233, 200, 0.78);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 48%);
+}

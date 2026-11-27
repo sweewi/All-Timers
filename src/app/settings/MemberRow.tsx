@@ -28,7 +28,7 @@ export function MemberRow({ m }: { m: MemberView }) {
             <button
               type="button"
               disabled={pending}
-              className="rounded-full border border-line px-3 py-1.5 hover:border-accent disabled:opacity-50"
+              className="btn btn-marble btn-sm"
               onClick={() =>
                 start(async () => {
                   const r = await setAdmin(m.id, !m.isAdmin);
@@ -66,12 +66,12 @@ export function MemberRow({ m }: { m: MemberView }) {
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder={`Type ${m.name} to confirm`}
-              className="min-w-0 flex-1 rounded-full border border-red-200 bg-white px-3 py-1.5"
+              className="field"
               autoComplete="off"
             />
             <button
               disabled={pending || typed.trim().toLowerCase() !== m.name.trim().toLowerCase()}
-              className="rounded-full bg-red-700 px-4 py-1.5 font-medium text-white disabled:opacity-40"
+              className="btn btn-danger btn-sm"
             >
               {pending ? "Removing…" : `Remove ${m.name}`}
             </button>

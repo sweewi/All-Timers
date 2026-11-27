@@ -48,7 +48,7 @@ const display = localFont({
 
 export const metadata: Metadata = {
   title: "All-Timers",
-  description: "Your friends' all-time favorite songs, ranked.",
+  description: "Everyone's all-time favorite songs, ranked together.",
 };
 
 // Every page is per-user and reads the database, so render on each request.

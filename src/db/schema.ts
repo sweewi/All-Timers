@@ -1,4 +1,5 @@
 import {
+  doublePrecision,
   bigint,
   boolean,
   index,
@@ -404,3 +405,43 @@ export type Track = typeof tracks.$inferSelect;
 export type Origin = typeof origins.$inferSelect;
 export type StatsfmAccount = typeof statsfmAccounts.$inferSelect;
 export type MonthlyRound = typeof monthlyRounds.$inferSelect;
+
+// ---------------------------------------------------------------------------- ratings
+
+export const RATING_BUCKETS = ["loved", "fine", "disliked"] as const;
+export type RatingBucket = (typeof RATING_BUCKETS)[number];
+
+/**
+ * Beli-style ratings: a gut bucket, then head-to-head picks place the song in the
+ * person's own ranking. `ord` orders songs within a bucket (higher = better; new songs
+ * get the midpoint between neighbours). `score` (0–10) is derived from the position and
+ * re-derived for the whole bucket on every change, so it's always consistent.
+ */
+export const ratings = pgTable(
+  "ratings",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    trackId: text("track_id")
+      .notNull()
+      .references(() => tracks.id),
+    bucket: text("bucket", { enum: RATING_BUCKETS }).notNull(),
+    ord: doublePrecision("ord").notNull(),
+    score: real("score").notNull(),
+    /** an optional one-line take */
+    note: text("note"),
+    /** how many head-to-heads placed it (0 = placed without comparing) */
+    comparisons: integer("comparisons").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.trackId] }),
+    index("ratings_user_bucket_ord_idx").on(t.userId, t.bucket, t.ord),
+    index("ratings_track_idx").on(t.trackId),
+    index("ratings_created_idx").on(t.createdAt),
+  ],
+);
+export type Rating = typeof ratings.$inferSelect;
+

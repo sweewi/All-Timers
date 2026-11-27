@@ -27,7 +27,7 @@ export type StatsfmView = {
   repeats: boolean;
 };
 
-const btn = "rounded-full border border-line px-4 py-2 text-sm hover:border-accent hover:text-accent disabled:opacity-50";
+const btn = "btn btn-marble btn-sm";
 
 export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
   const [value, setValue] = useState("");
@@ -61,7 +61,7 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
             autoCorrect="off"
             spellCheck={false}
             maxLength={300}
-            className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 text-sm outline-none focus:border-accent"
+            className="field"
           />
           {(
             <button
@@ -114,7 +114,7 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
       <Health a={account} />
 
       {account.status === "gone" && (
-        <p className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700">
+        <p className="note note-red text-sm">
           stats.fm can&apos;t find this account anymore (renamed or deleted?). Unlink and link it again.
         </p>
       )}
@@ -240,7 +240,7 @@ function Health({ a }: { a: StatsfmView }) {
   }
   if (!notes.length) return null;
   return (
-    <ul className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-[#5b4a1f]">
+    <ul className="note note-amber space-y-2 text-sm">
       {notes.map((n, i) => (
         <li key={i}>{n}</li>
       ))}

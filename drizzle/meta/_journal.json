@@ -71,6 +71,13 @@
       "when": 1795750542723,
       "tag": "0009_memberships",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795760131385,
+      "tag": "0010_ratings",
+      "breakpoints": true
     }
   ]
 }

@@ -18,7 +18,7 @@ export function GroupList({ groups }: { groups: { id: string; name: string; admi
             <button
               type="button"
               disabled={pending}
-              className="rounded-full border border-line px-3 py-1.5 hover:border-accent disabled:opacity-50"
+              className="btn btn-marble btn-sm"
               onClick={() => start(() => switchGroup(g.id))}
             >
               Switch to it
