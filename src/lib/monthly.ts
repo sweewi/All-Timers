@@ -9,6 +9,8 @@ import { buildPool, revealAt, tally, type MonthPick } from "./monthly-math";
 export const NOMINATIONS_PER_PERSON = 3;
 export const PICKS_PER_PERSON = 5;
 export const POOL_MAX = 30;
+/** a song needs this many plays in the month to count as someone's most-played */
+export const MIN_PLAYS = 2;
 
 export function phaseOf(round: Pick<MonthlyRound, "month" | "status">, now = Date.now()) {
   const { before } = monthWindow(round.month);
@@ -63,7 +65,9 @@ export async function refreshPool(round: MonthlyRound) {
       .where(and(eq(schema.listenTops.userId, userId), eq(schema.listenTops.period, `m:${round.month}`)))
       .orderBy(asc(schema.listenTops.position))
       .limit(PICKS_PER_PERSON);
-    if (rows.length) perUser.set(userId, rows);
+    // "most played" needs a repeat: a song played once this month isn't anyone's favorite yet
+    const picks = rows.filter((r): r is MonthPick => r.streams != null && r.streams >= MIN_PLAYS);
+    if (picks.length) perUser.set(userId, picks);
   }
   const pool = buildPool(perUser, PICKS_PER_PERSON, POOL_MAX);
   const fresh = new Map(pool.map((p) => [p.trackId, p]));
@@ -78,8 +82,9 @@ export async function refreshPool(round: MonthlyRound) {
       if (e.source === "plays" && !ranked.has(e.trackId)) {
         await tx.delete(schema.monthlyPool).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
       } else if (e.source === "plays") {
-        // kept for the ballots that have it; sinks below this month's real plays
-        await tx.update(schema.monthlyPool).set({ weight: 0.01 }).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
+        // kept for the ballots that have it; sinks below this month's real plays, and stops
+        // claiming play counts it no longer has
+        await tx.update(schema.monthlyPool).set({ weight: 0.01, detail: "[]" }).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
       } else if (e.detail !== "[]") {
         await tx.update(schema.monthlyPool).set({ weight: 0.5, detail: "[]" }).where(and(eq(schema.monthlyPool.roundId, round.id), eq(schema.monthlyPool.trackId, e.trackId)));
       }

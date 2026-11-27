@@ -11,7 +11,7 @@ async function main() {
   await refreshListening(theo.id, { force: true });
   const top = await getTop(theo.id, "lifetime", 6);
   console.log("lifetime by plays:", top.map((t) => `${t.position}:${t.streams}`).join(" "));
-  const sorted = top.every((t, i) => i === 0 || top[i - 1].streams >= t.streams);
+  const sorted = top.every((t, i) => i === 0 || (top[i - 1].streams ?? 0) >= (t.streams ?? 0));
   console.log("sorted by plays:", sorted);
   const round = await ensureRound(theo.crewId);
   // plant a stale plays-song nobody ranked, and a stale one somebody ranked

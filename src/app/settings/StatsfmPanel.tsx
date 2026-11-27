@@ -19,6 +19,12 @@ export type StatsfmView = {
   streams: number | null;
   hours: number | null;
   synced: string | null;
+  isPlus: boolean;
+  syncing: boolean | null;
+  imported: boolean | null;
+  recentStreams: number | null;
+  recentTracks: number | null;
+  repeats: boolean;
 };
 
 const btn = "rounded-full border border-line px-4 py-2 text-sm hover:border-accent hover:text-accent disabled:opacity-50";
@@ -89,12 +95,6 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        {account.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={account.imageUrl} alt="" className="h-11 w-11 rounded-full object-cover" />
-        ) : (
-          <span className="h-11 w-11 rounded-full bg-line" />
-        )}
         <div className="flex-1 text-sm">
           <div className="font-medium">{account.displayName}</div>
           {handle && (
@@ -110,6 +110,8 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
           </div>
         )}
       </div>
+
+      <Health a={account} />
 
       {account.status === "gone" && (
         <p className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700">
@@ -197,5 +199,43 @@ function RefreshButton() {
       </button>
       {res && <span className="text-xs text-muted">{res}</span>}
     </span>
+  );
+}
+
+/** What stats.fm actually has for this person, and what to do about gaps. */
+function Health({ a }: { a: StatsfmView }) {
+  const notes: React.ReactNode[] = [];
+  if (a.syncing === false) {
+    notes.push(
+      <>
+        <b>stats.fm isn&apos;t syncing your Spotify right now</b>, so it only catches some of what you play
+        {a.recentStreams != null && ` (it saw ${a.recentStreams} plays in the last 4 weeks)`}. Turn it on in the stats.fm app:{" "}
+        <b>Settings → Connections → Sync streams</b>.
+      </>,
+    );
+  }
+  if (!a.repeats) {
+    notes.push(
+      <>
+        Lately stats.fm has about one play per song ({a.recentStreams} plays, {a.recentTracks} songs), so there&apos;s no real &ldquo;most
+        played&rdquo; yet. Until there are repeats, your plays won&apos;t pick songs for the monthly list; nominate songs there instead.
+      </>,
+    );
+  }
+  if (!a.isPlus) {
+    notes.push(
+      <>
+        Free stats.fm gives rankings but hides play counts for 4-week, 6-month and lifetime lists, so your column shows ranks (&ldquo;#12
+        most played&rdquo;) instead of counts.{a.imported === false && " Importing your full Spotify history (for accurate lifetime numbers) needs stats.fm Plus."}
+      </>,
+    );
+  }
+  if (!notes.length) return null;
+  return (
+    <ul className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-[#5b4a1f]">
+      {notes.map((n, i) => (
+        <li key={i}>{n}</li>
+      ))}
+    </ul>
   );
 }

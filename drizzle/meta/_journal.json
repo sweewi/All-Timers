@@ -50,6 +50,20 @@
       "when": 1795747952662,
       "tag": "0006_guide_seen",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795749268676,
+      "tag": "0007_streams_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795749400016,
+      "tag": "0008_statsfm_health",
+      "breakpoints": true
     }
   ]
 }

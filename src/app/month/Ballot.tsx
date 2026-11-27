@@ -29,6 +29,8 @@ export type PoolCard = {
   imageUrl: string | null;
   nominatedBy: string | null;
   mine: boolean;
+  /** dropped out of everyone's top plays but stays because someone already ranked it */
+  kept: boolean;
   from: { name: string; color: string; rank: number; streams: number | null }[];
 };
 
@@ -153,6 +155,11 @@ export function Ballot({
                 {p.nominatedBy && (
                   <span className="sticker sticker-paper">
                     picked by {p.nominatedBy}
+                  </span>
+                )}
+                {p.kept && (
+                  <span className="sticker sticker-paper" title="It left everyone's top plays, but stays because it's already on a ballot">
+                    stays: on a ballot
                   </span>
                 )}
               </span>

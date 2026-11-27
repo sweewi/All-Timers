@@ -42,6 +42,8 @@ export type Receipts = {
 function playsText(p: MonumentSong["plays"]) {
   if (!p) return null;
   if (p.streams != null) return `${p.streams.toLocaleString()} ${p.streams === 1 ? "play" : "plays"}`;
+  // free stats.fm accounts get a rank without a count
+  if (p.rank != null) return `#${p.rank} most played`;
   if (p.under) return `under ${p.under} plays`;
   return null;
 }
@@ -540,7 +542,7 @@ function Plaque({
             {song.plays && playsText(song.plays) && (
               <div className="mt-2 text-sm text-[#6e624f]">
                 <span className="font-semibold text-[#3d3427]">{playsText(song.plays)}</span>
-                {song.plays.rank != null && <> · #{song.plays.rank} most played, ever</>}
+                {song.plays.rank != null && song.plays.streams != null && <> · #{song.plays.rank} most played, ever</>}
                 <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-[#a3977f] hover:underline">stats.fm</a>
               </div>
             )}

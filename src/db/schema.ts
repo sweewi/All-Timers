@@ -203,6 +203,13 @@ export const statsfmAccounts = pgTable(
     lifetimeStreams: integer("lifetime_streams"),
     lifetimeMs: bigint("lifetime_ms", { mode: "number" }),
     uniqueTracks: integer("unique_tracks"),
+    /** stats.fm's own sync of this person's Spotify is on (null = unknown) */
+    syncing: boolean("syncing"),
+    /** they imported their full Spotify history into stats.fm (needs stats.fm Plus) */
+    imported: boolean("imported"),
+    /** plays stats.fm recorded in the last 4 weeks, and how many distinct songs: a data-health signal */
+    recentStreams: integer("recent_streams"),
+    recentTracks: integer("recent_tracks"),
     status: text("status").$type<(typeof STATSFM_STATUS)[number]>().notNull().default("ok"),
     lastError: text("last_error"),
     connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
@@ -226,7 +233,8 @@ export const listenTops = pgTable(
       .notNull()
       .references(() => tracks.id),
     position: integer("position").notNull(),
-    streams: integer("streams").notNull(),
+    /** null = stats.fm didn't say (free accounts get Spotify's ranking without counts) */
+    streams: integer("streams"),
     playedMs: bigint("played_ms", { mode: "number" }),
   },
   (t) => [primaryKey({ columns: [t.userId, t.period, t.trackId] }), index("listen_tops_rank_idx").on(t.userId, t.period, t.position)],

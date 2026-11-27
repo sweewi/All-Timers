@@ -187,7 +187,7 @@ export default async function Home() {
                       <Link href={`/u/${r.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: r.user.color }}>
                         {mineToo ? "You" : r.user.name}
                       </Link>
-                      <span className="sticker sticker-paper">{compact(r.streams)} plays</span>
+                      <span className="sticker sticker-paper">{r.streams != null ? `${compact(r.streams)} plays` : `their #${r.position} lately`}</span>
                     </span>
                     {!mineToo && !social.has(r.track) && (
                       <span className="mt-2">

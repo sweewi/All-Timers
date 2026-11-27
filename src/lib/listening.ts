@@ -134,6 +134,8 @@ export async function connectStatsfm(userId: string, input: string): Promise<Con
     imageUrl: profile.image,
     isPlus: profile.isPlus,
     privacy: JSON.stringify(profile.privacy),
+    syncing: profile.syncing,
+    imported: profile.imported,
     status: "ok" as const,
     lastError: null,
     checkedAt: new Date(),
@@ -234,7 +236,8 @@ async function storeTop(userId: string, period: Period, items: TopTrack[], trunc
   // by plays (ties keep stats.fm's order) and number from 1 over the songs we can show
   const seen = new Set<string>();
   const rows: (typeof schema.listenTops.$inferInsert)[] = [];
-  const byPlays = items.map((i, idx) => ({ i, idx })).sort((a, b) => b.i.streams - a.i.streams || a.idx - b.idx);
+  // (free stats.fm accounts get no counts for rolling ranges: then stats.fm's own order stands)
+  const byPlays = items.map((i, idx) => ({ i, idx })).sort((a, b) => (b.i.streams ?? -1) - (a.i.streams ?? -1) || a.idx - b.idx);
   for (const { i } of byPlays) {
     const id = spotifyIdOf(i.track);
     if (!id || seen.has(id)) continue;
@@ -245,7 +248,8 @@ async function storeTop(userId: string, period: Period, items: TopTrack[], trunc
     await tx.delete(schema.listenTops).where(and(eq(schema.listenTops.userId, userId), eq(schema.listenTops.period, period)));
     for (let i = 0; i < rows.length; i += 250) await tx.insert(schema.listenTops).values(rows.slice(i, i + 250));
     // past the fetched depth, a song most likely has fewer plays than the least-played one we saw
-    const least = items.length ? Math.min(...items.map((i) => i.streams)) : null;
+    const counts = items.map((i) => i.streams).filter((n): n is number => n != null);
+    const least = counts.length ? Math.min(...counts) : null;
     const sync = { fetchedAt: new Date(), rows: rows.length, floor: truncated ? least : 0 };
     await tx
       .insert(schema.listenSyncs)
@@ -283,6 +287,7 @@ export async function refreshListening(userId: string, opts: { force?: boolean; 
       const p = await getProfile(acct.statsfmId);
       if (!p) throw new NetError("stats.fm user not found", 404, "api.stats.fm");
       const totals = p.privacy.streamStats === false ? null : await getLifetimeTotals(acct.statsfmId).catch(() => null);
+      const recent = p.privacy.streamStats === false ? null : await getLifetimeTotals(acct.statsfmId, "weeks").catch(() => null);
       await db
         .update(schema.statsfmAccounts)
         .set({
@@ -291,6 +296,10 @@ export async function refreshListening(userId: string, opts: { force?: boolean; 
           imageUrl: p.image,
           isPlus: p.isPlus,
           privacy: JSON.stringify(p.privacy),
+          syncing: p.syncing,
+          imported: p.imported,
+          recentStreams: recent?.streams ?? null,
+          recentTracks: recent?.uniqueTracks ?? null,
           lifetimeStreams: totals?.streams ?? null,
           lifetimeMs: totals?.ms ?? null,
           uniqueTracks: totals?.uniqueTracks ?? null,
@@ -366,7 +375,8 @@ export async function fetchMonth(userId: string, key: string) {
 
 // ---------------------------------------------------------------------------- reads
 
-export type Plays = { streams: number; rank: number };
+/** streams null: stats.fm gave a rank but no count (free accounts) */
+export type Plays = { streams: number | null; rank: number };
 
 /**
  * Lifetime play counts for these songs. Songs past the depth we fetched get
@@ -403,7 +413,7 @@ export async function getPlays(userId: string, trackIds: string[]) {
         const id = a.key ? want.get(a.key) : undefined;
         if (!id) continue;
         const cur = out.byTrack.get(id);
-        if (!cur || a.streams > cur.streams) out.byTrack.set(id, { streams: a.streams, rank: a.position });
+        if (!cur || a.position < cur.rank) out.byTrack.set(id, { streams: a.streams, rank: a.position });
       }
     }
   }
@@ -529,6 +539,16 @@ export async function getLiveNow(crewId: string, budget = 4) {
 export type LiveNow = Awaited<ReturnType<typeof getLiveNow>>[number];
 
 /**
+ * Does stats.fm's data for this person show any favorites lately? If the last four
+ * weeks hold about as many plays as distinct songs (every song once), "most played"
+ * is a coin toss, and we say so instead of pretending.
+ */
+export function hasRepeats(a: Pick<StatsfmAccount, "recentStreams" | "recentTracks">) {
+  if (!a.recentStreams || !a.recentTracks) return true; // unknown: give it the benefit of the doubt
+  return a.recentStreams / a.recentTracks >= 1.2;
+}
+
+/**
  * On repeat: what each crew member has played most over the last four weeks.
  * Up to `perPerson` songs each, highest plays first, with who's behind them.
  */
@@ -539,9 +559,9 @@ export async function heavyRotation(crewId: string, perPerson = 3) {
     .from(schema.statsfmAccounts)
     .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
     .where(eq(schema.users.crewId, crewId));
-  const out: { user: (typeof rows)[number]["user"]; track: Track; streams: number; position: number }[] = [];
+  const out: { user: (typeof rows)[number]["user"]; track: Track; streams: number | null; position: number }[] = [];
   for (const { a, user } of rows) {
-    if (!visibility(a).plays) continue;
+    if (!visibility(a).plays || !hasRepeats(a)) continue;
     const top = await db
       .select({ position: schema.listenTops.position, streams: schema.listenTops.streams, track: schema.tracks })
       .from(schema.listenTops)
@@ -549,10 +569,10 @@ export async function heavyRotation(crewId: string, perPerson = 3) {
       .where(and(eq(schema.listenTops.userId, a.userId), eq(schema.listenTops.period, "weeks")))
       .orderBy(asc(schema.listenTops.position))
       .limit(perPerson);
-    for (const t of top) out.push({ user, track: t.track, streams: t.streams, position: t.position });
+    for (const t of top) if (t.streams == null || t.streams >= 2) out.push({ user, track: t.track, streams: t.streams, position: t.position });
   }
   // interleave people so one heavy listener doesn't fill the rail
-  return out.sort((x, y) => x.position - y.position || y.streams - x.streams);
+  return out.sort((x, y) => x.position - y.position || (y.streams ?? 0) - (x.streams ?? 0));
 }
 
 /**
@@ -576,12 +596,14 @@ export async function onDeckSuggestions(userId: string, have: Set<string>, limit
     for (const k of ks) haveKeys.add(k.key);
   }
   const seen = new Set<string>();
-  const out: { track: Track; streams: number; period: string }[] = [];
+  if (!hasRepeats(acct)) return [];
+  const out: { track: Track; streams: number | null; period: string }[] = [];
   // the last four weeks first, then the last six months
   for (const period of ["weeks", "months"]) {
     for (const r of rows.filter((x) => x.period === period)) {
       // "keep playing" means it: a few plays a month, not one stray listen
-      if (r.streams < (period === "weeks" ? 3 : 6)) continue;
+      // with counts: a few plays at least; without (free stats.fm): near the top of their list
+      if (r.streams != null ? r.streams < (period === "weeks" ? 3 : 6) : r.position > (period === "weeks" ? 10 : 15)) continue;
       if (have.has(r.track.id) || haveKeys.has(r.track.songKey) || seen.has(r.track.songKey)) continue;
       seen.add(r.track.songKey);
       out.push({ track: r.track, streams: r.streams, period });

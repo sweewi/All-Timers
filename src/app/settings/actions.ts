@@ -169,3 +169,16 @@ export async function removeMember(memberId: string, typedName: string): Promise
   refresh();
   return { ok: true, message: `${member.name} was removed.` };
 }
+
+/** Admin only: rename the group (shown on the plaza, invites, and the monthly playlist). */
+export async function renameGroup(nameIn: string): Promise<{ ok: boolean; message: string }> {
+  const admin = await requireUser();
+  if (!admin.isAdmin) throw new Error("Not allowed");
+  const name = parse(z.string().max(200), nameIn).trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!name) return { ok: false, message: "The group needs a name." };
+  await budget("write", admin.id);
+  const db = await getDb();
+  await db.update(schema.crews).set({ name }).where(eq(schema.crews.id, admin.crewId));
+  refresh();
+  return { ok: true, message: `Renamed to ${name}.` };
+}

@@ -41,6 +41,9 @@ const UserSchema = z.object({
     image: z.string().url().nullish(),
     isPlus: z.boolean().optional().default(false),
     privacySettings: Privacy.nullish(),
+    syncEnabled: z.boolean().nullish(),
+    hasImported: z.boolean().nullish(),
+    spotifyAuth: z.object({ sync: z.boolean().nullish(), imported: z.boolean().nullish() }).partial().nullish(),
   }),
 });
 
@@ -188,6 +191,9 @@ export type StatsfmProfile = {
   image: string | null;
   isPlus: boolean;
   privacy: StatsfmPrivacy;
+  /** is stats.fm continuously syncing their Spotify? */
+  syncing: boolean | null;
+  imported: boolean | null;
 };
 
 /** Look a user up by handle or id. null if stats.fm has no such user. */
@@ -205,11 +211,13 @@ export async function getProfile(handle: string): Promise<StatsfmProfile | null>
     image: u.image ?? null,
     isPlus: u.isPlus ?? false,
     privacy: u.privacySettings ?? {},
+    syncing: u.spotifyAuth?.sync ?? u.syncEnabled ?? null,
+    imported: u.spotifyAuth?.imported ?? u.hasImported ?? null,
   };
 }
 
 export type Range = "weeks" | "months" | "lifetime";
-export type TopTrack = { position: number; streams: number; playedMs: number | null; track: StatsfmTrack };
+export type TopTrack = { position: number; streams: number | null; playedMs: number | null; track: StatsfmTrack };
 
 /** Top tracks for a rolling range, or an exact window ({ after, before } in ms). */
 export async function getTopTracks(id: string, when: Range | { after: number; before: number }, limit = 50, offset = 0): Promise<TopTrack[]> {
@@ -220,11 +228,11 @@ export async function getTopTracks(id: string, when: Range | { after: number; be
     q.set("before", String(Math.floor(when.before)));
   }
   const { data } = await get(`/users/${enc(id)}/top/tracks?${q}`, TopTracksSchema);
-  return data.items.map((i) => ({ position: i.position, streams: i.streams ?? 0, playedMs: i.playedMs ?? null, track: i.track }));
+  return data.items.map((i) => ({ position: i.position, streams: i.streams ?? null, playedMs: i.playedMs ?? null, track: i.track }));
 }
 
-export async function getLifetimeTotals(id: string) {
-  const { data } = await get(`/users/${enc(id)}/streams/stats?range=lifetime`, StreamStatsSchema);
+export async function getLifetimeTotals(id: string, range: "lifetime" | "weeks" = "lifetime") {
+  const { data } = await get(`/users/${enc(id)}/streams/stats?range=${range}`, StreamStatsSchema);
   return {
     streams: data.items.count ?? null,
     ms: data.items.durationMs ?? null,

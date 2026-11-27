@@ -6,11 +6,12 @@ import { signOut } from "@/app/actions";
 import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
 import { MemberRow } from "./MemberRow";
+import { RenameGroup } from "./RenameGroup";
 import { makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
 import { ActionButton } from "./ActionButton";
 import { Altitude } from "@/components/World";
 import { StatsfmPanel, type StatsfmView } from "./StatsfmPanel";
-import { getAccount, visibility } from "@/lib/listening";
+import { getAccount, hasRepeats, visibility } from "@/lib/listening";
 import { timeAgo } from "@/lib/time";
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
@@ -43,6 +44,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       streams: v.totals ? acct.lifetimeStreams : null,
       hours: v.totals && acct.lifetimeMs != null ? Math.round(Number(acct.lifetimeMs) / 3_600_000) : null,
       synced: lastSync ? timeAgo(lastSync) : null,
+      isPlus: acct.isPlus,
+      syncing: acct.syncing,
+      imported: acct.imported,
+      recentStreams: acct.recentStreams,
+      recentTracks: acct.recentTracks,
+      repeats: hasRepeats(acct),
     };
   }
   const hasSpotifyApp = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
@@ -53,11 +60,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <h1 className="rank-num text-5xl">Settings</h1>
 
       <section className="space-y-3">
-        <h2 className="font-medium">Sign in on another device</h2>
+        <h2 className="font-medium">Your other devices</h2>
         <p className="text-sm text-muted">
-          There are no passwords. Make a link here and open it on your phone or laptop to sign in there.
+          There are no passwords. To use the site on your phone or laptop, make a link here and open it there. It signs in as{" "}
+          <b>you</b>, so keep it to yourself.
         </p>
-        <LinkMaker make={makeMyLoginLink} label="Make a sign-in link" />
+        <LinkMaker make={makeMyLoginLink} label="Make a link for my other device" />
       </section>
 
       <section className="space-y-3" id="statsfm">
@@ -66,12 +74,18 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-medium">Invite people to {crew.name}</h2>
+        <h2 className="font-medium">Invite new people to {crew.name}</h2>
+        <p className="text-sm text-muted">For friends joining for the first time: they pick their name and get their own column.</p>
         <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
       </section>
 
       {user.isAdmin && (
         <>
+          <section className="space-y-3" id="group">
+            <h2 className="font-medium">Group name</h2>
+            <RenameGroup current={crew.name} />
+          </section>
+
           <section className="space-y-3" id="members">
             <h2 className="font-medium">Members</h2>
             <p className="text-sm text-muted">

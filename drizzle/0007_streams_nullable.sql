@@ -1,0 +1,1 @@
+ALTER TABLE "listen_tops" ALTER COLUMN "streams" DROP NOT NULL;

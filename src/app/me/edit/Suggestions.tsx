@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { addFromListening } from "./actions";
 
-export type Suggestion = { id: string; name: string; artists: string; imageUrl: string | null; streams: number; recent: boolean };
+export type Suggestion = { id: string; name: string; artists: string; imageUrl: string | null; streams: number | null; recent: boolean };
 
 /** "You keep playing these": recent heavy rotation that isn't on either list yet. */
 export function Suggestions({ items, linked }: { items: Suggestion[]; linked: boolean }) {
@@ -35,7 +35,7 @@ export function Suggestions({ items, linked }: { items: Suggestion[]; linked: bo
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{s.name}</div>
               <div className="truncate text-sm text-muted">
-                {s.artists} · {s.streams.toLocaleString()} {s.streams === 1 ? "play" : "plays"} {s.recent ? "in 4 weeks" : "in 6 months"}
+                {s.artists} · {s.streams != null ? `${s.streams.toLocaleString()} ${s.streams === 1 ? "play" : "plays"} ${s.recent ? "in 4 weeks" : "in 6 months"}` : `in your top songs ${s.recent ? "lately" : "these months"}`}
               </div>
             </div>
             {added.has(s.id) ? (

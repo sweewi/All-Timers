@@ -80,6 +80,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
     imageUrl: p.track.imageUrl,
     nominatedBy: p.nominatedBy ? (p.nominatedBy === viewer.id ? "you" : (who.get(p.nominatedBy)?.name ?? "someone")) : null,
     mine: p.nominatedBy === viewer.id,
+    kept: p.source === "plays" && p.detail.length === 0,
     from: p.detail
       .filter((d) => who.has(d.userId))
       .map((d) => {
@@ -90,6 +91,14 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
       }),
   }));
   const myNominations = pool.filter((p) => p.nominatedBy === viewer.id).length;
+  // linked members whose month has no song with a repeat yet (nothing of theirs in the pool by plays)
+  const contributed = new Set(pool.flatMap((p) => p.detail.map((d) => d.userId)));
+  const quiet = members
+    .filter((m) => {
+      const acct = accts.get(m.id);
+      return acct && visibility(acct).tops && !contributed.has(m.id);
+    })
+    .map((m) => (m.id === viewer.id ? "you" : m.name));
 
   return (
     <div className="monthly">
@@ -145,8 +154,15 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
             </p>
             {myNominations < NOMINATIONS_PER_PERSON && <NominateForm month={month} />}
           </div>
+          {quiet.length > 0 && (
+            <p className="mt-4 max-w-2xl text-sm text-white/90">
+              No repeats yet this month from {quiet.join(", ")}: a song needs 2+ plays to count as someone&apos;s most played. Nominations
+              work for everyone.
+            </p>
+          )}
           <p className="mt-4 text-xs text-white/80">
-            Pool: each person&apos;s top 5 by plays this calendar month, weighted so everyone counts the same however much they listen. Plays via{" "}
+            Pool: each person&apos;s top 5 by plays this calendar month (2+ plays each), weighted so everyone counts the same however much
+            they listen. Plays via{" "}
             <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="underline">stats.fm</a>.
           </p>
         </section>
