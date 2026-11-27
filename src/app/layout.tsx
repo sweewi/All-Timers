@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 import { World } from "@/components/World";
 import { Footpath } from "@/components/Footpath";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const roman = localFont({
   src: [
@@ -91,6 +92,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8">{children}</main>
         {user && <Footpath handle={user.handle} />}
         {user && <Guide autoOpen={!user.guideSeenAt} />}
+        <SpeedInsights />
       </body>
     </html>
   );
