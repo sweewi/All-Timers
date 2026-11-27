@@ -1060,3 +1060,30 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 48%);
 }
+
+/* ---------------------------------------------------------------- preview sandbox strip */
+.sandbox-bar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.25rem;
+  padding: 0.5rem 1.25rem;
+  background: repeating-linear-gradient(-45deg, #2b2418 0 14px, #332a1b 14px 28px);
+  color: #f3e6c8;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #7a5f2a;
+}
+.sandbox-bar b { color: #f0c86a; font-weight: 600; }
+.sandbox-who { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.sandbox-who > span { opacity: 0.75; margin-right: 0.25rem; }
+.sandbox-who button {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.15rem 0.6rem; border-radius: 999px;
+  border: 1px solid rgba(243, 230, 200, 0.25); color: inherit; background: transparent; cursor: pointer;
+}
+.sandbox-who button::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--dot); }
+.sandbox-who button[aria-pressed="true"] { background: #f0c86a; color: #2b2418; border-color: #f0c86a; }
+.sandbox-who button:focus-visible { outline: 2px solid #f0c86a; outline-offset: 2px; }

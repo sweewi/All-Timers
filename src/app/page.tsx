@@ -71,7 +71,7 @@ export default async function Home() {
           <h1 className="hero-line">
             Which songs are
             <br />
-            <em>your All-Timers?</em>
+            <em>our All-Timers?</em>
           </h1>
           <p className="hero-sub">
             {members.length > 1 ? `${members.length} columns on the plaza. Tap one to climb it.` : "The plaza fills up as friends join. Send them the invite."}
