@@ -4,7 +4,7 @@ import { getCrewMembers } from "@/lib/lists";
 import { freshTakes, groupTop, myRanking, rateQueue, tasteMatches } from "@/lib/ratings";
 import { artistLine } from "@/lib/songs";
 import { timeAgo } from "@/lib/time";
-import { RateButton } from "@/components/RateFlow";
+import { RateButton, RateRunButton } from "@/components/RateFlow";
 import { Altitude } from "@/components/World";
 import { Art } from "@/components/track";
 import { BANDS } from "@/lib/rating-math";
@@ -44,6 +44,11 @@ export default async function RatePage() {
       <section>
         <h2 className="tall-h text-4xl">Up next</h2>
         <p className="tall-sub">From this month&apos;s pool and everyone&apos;s columns.</p>
+        {queue.length > 1 && (
+          <div className="mt-4">
+            <RateRunButton songs={queue.map((q) => song(q.track))} label={`Rate all ${queue.length} in a row`} />
+          </div>
+        )}
         {queue.length ? (
           <div className="rail mt-4">
             {queue.map((q, i) => (
@@ -56,7 +61,7 @@ export default async function RatePage() {
                 <small>{artistLine(q.track.artists)}</small>
                 <span className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted">{q.why}</span>
-                  <RateButton song={song(q.track)} />
+                  <RateButton song={song(q.track)} queue={queue.slice(i + 1).map((n) => song(n.track))} />
                 </span>
               </div>
             ))}

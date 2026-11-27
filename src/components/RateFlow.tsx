@@ -17,8 +17,11 @@ export type RateSong = { id: string; name: string; artists: string; imageUrl: st
 type Rival = RateSong & { score: number };
 const EVENT = "alltimers:rate";
 
-export function openRating(song: RateSong) {
-  window.dispatchEvent(new CustomEvent<RateSong>(EVENT, { detail: song }));
+type Open = { song: RateSong; queue?: RateSong[] };
+
+/** Open the flow for one song; with a queue, the result screen offers the next one (a rating run). */
+export function openRating(song: RateSong, queue: RateSong[] = []) {
+  window.dispatchEvent(new CustomEvent<Open>(EVENT, { detail: { song, queue } }));
 }
 
 type Step =
@@ -31,15 +34,19 @@ type Step =
 
 export function RateFlowHost() {
   const [song, setSong] = useState<RateSong | null>(null);
+  const [queue, setQueue] = useState<RateSong[]>([]);
+  const [done, setDone] = useState(0);
   const [step, setStep] = useState<Step>({ at: "bucket" });
   const dialog = useRef<HTMLDialogElement>(null);
   const router = useRouter();
 
   useEffect(() => {
     const onRate = (e: Event) => {
-      const detail = (e as CustomEvent<RateSong>).detail;
-      if (!detail?.id) return;
-      setSong(detail);
+      const detail = (e as CustomEvent<Open>).detail;
+      if (!detail?.song?.id) return;
+      setSong(detail.song);
+      setQueue((detail.queue ?? []).filter((q) => q.id !== detail.song.id).slice(0, 20));
+      setDone(0);
       setStep({ at: "bucket" });
     };
     window.addEventListener(EVENT, onRate);
@@ -55,8 +62,18 @@ export function RateFlowHost() {
 
   const close = useCallback(() => {
     setSong(null);
+    setQueue([]);
     router.refresh();
   }, [router]);
+
+  const next = useCallback(() => {
+    const [head, ...rest] = queue;
+    if (!head) return close();
+    setSong(head);
+    setQueue(rest);
+    setDone((d) => d + 1);
+    setStep({ at: "bucket" });
+  }, [queue, close]);
 
   const place = useCallback(
     async (bucket: RatingBucket, rivals: Rival[], lo: number, comparisons: number) => {
@@ -139,10 +156,17 @@ export function RateFlowHost() {
           <button type="button" className="rate-close" onClick={close} aria-label="Close">
             ×
           </button>
-          {step.at === "bucket" && <BucketStep song={song} onPick={chooseBucket} />}
+          {queue.length > 0 || done > 0 ? (
+            <p className="rate-run" aria-live="polite">
+              Rating run · {done + 1} of {done + 1 + queue.length}
+            </p>
+          ) : null}
+          {step.at === "bucket" && <BucketStep song={song} onPick={chooseBucket} onSkip={queue.length ? next : undefined} />}
           {(step.at === "loading" || step.at === "saving") && <p className="rate-wait">{step.at === "loading" ? "Finding songs to compare…" : "Placing it…"}</p>}
           {step.at === "duel" && <Duel song={song} step={step} onAnswer={answer} />}
-          {step.at === "done" && <Result song={song} {...step} onClose={close} onRedo={() => setStep({ at: "bucket" })} />}
+          {step.at === "done" && (
+            <Result song={song} {...step} onClose={queue.length ? next : close} closeLabel={queue.length ? "Next song" : "Done"} onRedo={() => setStep({ at: "bucket" })} />
+          )}
           {step.at === "error" && (
             <div className="rate-error">
               <p>{step.message}</p>
@@ -166,7 +190,7 @@ function Cover({ song, size = 200 }: { song: RateSong; size?: number }) {
   );
 }
 
-function BucketStep({ song, onPick }: { song: RateSong; onPick: (b: RatingBucket) => void }) {
+function BucketStep({ song, onPick, onSkip }: { song: RateSong; onPick: (b: RatingBucket) => void; onSkip?: () => void }) {
   return (
     <div className="rate-bucket">
       <Cover song={song} size={168} />
@@ -183,6 +207,11 @@ function BucketStep({ song, onPick }: { song: RateSong; onPick: (b: RatingBucket
           </button>
         ))}
       </div>
+      {onSkip && (
+        <button type="button" className="btn-link mt-3 text-sm" onClick={onSkip}>
+          Haven&apos;t heard it, skip
+        </button>
+      )}
     </div>
   );
 }
@@ -243,6 +272,7 @@ function Result({
   bucket,
   onClose,
   onRedo,
+  closeLabel,
 }: {
   song: RateSong;
   score: number;
@@ -251,6 +281,7 @@ function Result({
   bucket: RatingBucket;
   onClose: () => void;
   onRedo: () => void;
+  closeLabel: string;
 }) {
   const shown = useCountUp(score);
   const [take, setTake] = useState("");
@@ -283,7 +314,7 @@ function Result({
         <div className="flex gap-2">
           <input id="rate-take" className="field" maxLength={280} value={take} onChange={(e) => setTake(e.target.value)} placeholder="The bridge alone is a 10." />
           <button type="submit" className="btn btn-gold" disabled={saved === "saving"}>
-            {take.trim() ? "Post take" : "Done"}
+            {take.trim() ? "Post take" : closeLabel}
           </button>
         </div>
         {saved === "error" && <p className="text-sm text-[#a2432f]">The take didn&apos;t save. Try again.</p>}
@@ -314,7 +345,7 @@ function useCountUp(target: number) {
 }
 
 /** A small button that opens the rating flow for one song, showing the score once it has one. */
-export function RateButton({ song, score, className = "" }: { song: RateSong; score?: number | null; className?: string }) {
+export function RateButton({ song, score, className = "", queue }: { song: RateSong; score?: number | null; className?: string; queue?: RateSong[] }) {
   return (
     <button
       type="button"
@@ -322,7 +353,7 @@ export function RateButton({ song, score, className = "" }: { song: RateSong; sc
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        openRating(song);
+        openRating(song, queue);
       }}
       aria-label={score != null ? `Rated ${score.toFixed(1)}. Change rating for ${song.name}` : `Rate ${song.name}`}
     >
@@ -333,6 +364,16 @@ export function RateButton({ song, score, className = "" }: { song: RateSong; sc
       ) : (
         "Rate"
       )}
+    </button>
+  );
+}
+
+/** Starts a run through a list of songs, one after another. */
+export function RateRunButton({ songs, label = "Start a rating run" }: { songs: RateSong[]; label?: string }) {
+  if (!songs.length) return null;
+  return (
+    <button type="button" className="btn btn-gold" onClick={() => openRating(songs[0], songs.slice(1))}>
+      {label}
     </button>
   );
 }

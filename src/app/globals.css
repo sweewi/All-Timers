@@ -1124,6 +1124,7 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
 .rate-close:focus-visible, .rate-b:focus-visible, .duel-card:focus-visible { outline: 3px solid #2a48c9; outline-offset: 3px; }
 .rate-cover { display: block; border-radius: 4px; object-fit: cover; box-shadow: 0 1px 0 #fff, 0 14px 26px -14px rgba(30, 20, 0, 0.6); }
 .rate-cover-blank { background: linear-gradient(135deg, #d8ccb2, #b9ac93); }
+.rate-run { margin: -6px 0 10px; text-align: center; font-size: 13px; color: #8a7a5c; font-variant-numeric: tabular-nums; }
 .rate-wait { padding: 48px 0; text-align: center; font-style: italic; color: #776a55; }
 .rate-error { display: grid; gap: 12px; justify-items: center; padding: 32px 0; text-align: center; }
 
