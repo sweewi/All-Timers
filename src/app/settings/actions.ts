@@ -9,6 +9,7 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { budget, parse, zId } from "@/lib/guard";
 import { RateLimited } from "@/lib/ratelimit";
+import { mirrorCrew } from "@/lib/mirror";
 import { connectStatsfm, disconnectStatsfm, refreshListening, setSwitches } from "@/lib/listening";
 
 export async function makeMyLoginLink() {
@@ -89,4 +90,14 @@ export async function refreshStatsfmNow(): Promise<string> {
   const r = await refreshListening(user.id, { force: true });
   refresh();
   return r.refreshed.length ? "Up to date" : "stats.fm didn't answer. We'll try again later.";
+}
+
+/** Admin only: push every column and finished month to the Spotify hub now. */
+export async function syncSpotifyMirrors(): Promise<string> {
+  const admin = await requireUser();
+  if (!admin.isAdmin) throw new Error("Not allowed");
+  await budget("link", admin.id);
+  const r = await mirrorCrew(admin.crewId);
+  if (r.skipped) return "Connect Spotify first.";
+  return `${r.synced} playlists synced${r.failed ? `, ${r.failed} failed (see logs)` : ""}`;
 }

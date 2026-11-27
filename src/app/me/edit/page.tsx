@@ -7,6 +7,8 @@ import { artistLine } from "@/lib/songs";
 import { EditClient, type EditItem } from "./EditClient";
 import { hasStory, toStoryValues } from "@/lib/story-values";
 import { Altitude } from "@/components/World";
+import { getAccount, onDeckSuggestions } from "@/lib/listening";
+import { Suggestions } from "./Suggestions";
 
 export default async function EditPage({ searchParams }: PageProps<"/me/edit">) {
   const user = await requireUser();
@@ -18,6 +20,10 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
     getCrewMembers(user.crewId),
     db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)),
   ]);
+
+  const [other, acct] = await Promise.all([getList(user.id, kind === "on_deck" ? "all_time" : "on_deck"), getAccount(user.id)]);
+  const have = new Set([...entries, ...other].map((e) => e.track.id));
+  const suggestions = acct ? await onDeckSuggestions(user.id, have, 8) : [];
 
   const items: EditItem[] = entries.map((e) => ({
     id: e.track.id,
@@ -65,6 +71,19 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
         members={members.filter((m) => m.id !== user.id).map((m) => ({ id: m.id, name: m.name, color: m.color }))}
         inviteCode={crew[0].inviteCode}
       />
+      {kind === "on_deck" && (
+        <Suggestions
+          linked={!!acct}
+          items={suggestions.map((x) => ({
+            id: x.track.id,
+            name: x.track.name,
+            artists: artistLine(x.track.artists),
+            imageUrl: x.track.imageUrl,
+            streams: x.streams,
+            recent: x.period === "weeks",
+          }))}
+        />
+      )}
     </div>
   );
 }

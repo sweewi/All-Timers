@@ -438,7 +438,7 @@ export async function getLive(crewId: string, budget = 4): Promise<Live[]> {
   if (!visible.length) return [];
   const cached = await db.select().from(schema.nowPlaying).where(inArray(schema.nowPlaying.userId, visible.map((a) => a.userId)));
   const byUser = new Map(cached.map((c) => [c.userId, c]));
-  const stale = visible.filter((a) => Date.now() - (byUser.get(a.userId)?.fetchedAt.getTime() ?? 0) > TTL.now).slice(0, budget);
+  const stale = budget > 0 ? visible.filter((a) => Date.now() - (byUser.get(a.userId)?.fetchedAt.getTime() ?? 0) > TTL.now).slice(0, budget) : [];
   await Promise.all(
     stale.map(async (a) => {
       try {
@@ -498,3 +498,101 @@ export async function sweepOldListening() {
   await db.delete(schema.nowPlaying).where(lt(schema.nowPlaying.fetchedAt, new Date(Date.now() - 86_400_000)));
 }
 
+
+
+/** Only what's actually playing, recently confirmed. Safe to send to the browser. */
+export async function getLiveNow(crewId: string, budget = 4) {
+  const live = await getLive(crewId, budget);
+  const fresh = Date.now() - 5 * 60_000;
+  const playing = live.filter((l) => l.isPlaying && l.track && l.fetchedAt.getTime() > fresh);
+  if (!playing.length) return [];
+  const db = await getDb();
+  const people = await db
+    .select({ id: schema.users.id, handle: schema.users.handle, name: schema.users.name, color: schema.users.color })
+    .from(schema.users)
+    .where(inArray(schema.users.id, playing.map((l) => l.userId)));
+  const who = new Map(people.map((p) => [p.id, p]));
+  return playing
+    .filter((l) => who.has(l.userId))
+    .map((l) => ({
+      handle: who.get(l.userId)!.handle,
+      name: who.get(l.userId)!.name,
+      color: who.get(l.userId)!.color,
+      track: { id: l.track!.id, name: l.track!.name, artists: l.track!.artists, imageUrl: l.track!.imageUrl },
+    }));
+}
+export type LiveNow = Awaited<ReturnType<typeof getLiveNow>>[number];
+
+/**
+ * On repeat: what each crew member has played most over the last four weeks.
+ * Up to `perPerson` songs each, highest plays first, with who's behind them.
+ */
+export async function heavyRotation(crewId: string, perPerson = 3) {
+  const db = await getDb();
+  const rows = await db
+    .select({ a: schema.statsfmAccounts, user: schema.users })
+    .from(schema.statsfmAccounts)
+    .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
+    .where(eq(schema.users.crewId, crewId));
+  const out: { user: (typeof rows)[number]["user"]; track: Track; streams: number; position: number }[] = [];
+  for (const { a, user } of rows) {
+    if (!visibility(a).plays) continue;
+    const top = await db
+      .select({ position: schema.listenTops.position, streams: schema.listenTops.streams, track: schema.tracks })
+      .from(schema.listenTops)
+      .innerJoin(schema.tracks, eq(schema.tracks.id, schema.listenTops.trackId))
+      .where(and(eq(schema.listenTops.userId, a.userId), eq(schema.listenTops.period, "weeks")))
+      .orderBy(asc(schema.listenTops.position))
+      .limit(perPerson);
+    for (const t of top) out.push({ user, track: t.track, streams: t.streams, position: t.position });
+  }
+  // interleave people so one heavy listener doesn't fill the rail
+  return out.sort((x, y) => x.position - y.position || y.streams - x.streams);
+}
+
+/**
+ * Songs you've been playing a lot lately that aren't on either of your lists yet:
+ * the natural candidates for On Deck.
+ */
+export async function onDeckSuggestions(userId: string, have: Set<string>, limit = 8) {
+  const acct = await getAccount(userId);
+  // your own suggestions: only stats.fm's own privacy matters, not what you show the crew
+  if (!acct || !visibility(acct).tops) return [];
+  const db = await getDb();
+  const rows = await db
+    .select({ period: schema.listenTops.period, position: schema.listenTops.position, streams: schema.listenTops.streams, track: schema.tracks })
+    .from(schema.listenTops)
+    .innerJoin(schema.tracks, eq(schema.tracks.id, schema.listenTops.trackId))
+    .where(and(eq(schema.listenTops.userId, userId), inArray(schema.listenTops.period, ["weeks", "months"])))
+    .orderBy(asc(schema.listenTops.position));
+  const haveKeys = new Set<string>();
+  if (have.size) {
+    const ks = await db.select({ key: schema.tracks.songKey }).from(schema.tracks).where(inArray(schema.tracks.id, [...have]));
+    for (const k of ks) haveKeys.add(k.key);
+  }
+  const seen = new Set<string>();
+  const out: { track: Track; streams: number; period: string }[] = [];
+  // the last four weeks first, then the last six months
+  for (const period of ["weeks", "months"]) {
+    for (const r of rows.filter((x) => x.period === period)) {
+      // "keep playing" means it: a few plays a month, not one stray listen
+      if (r.streams < (period === "weeks" ? 3 : 6)) continue;
+      if (have.has(r.track.id) || haveKeys.has(r.track.songKey) || seen.has(r.track.songKey)) continue;
+      seen.add(r.track.songKey);
+      out.push({ track: r.track, streams: r.streams, period });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
+/** True if stats.fm shows this person played this exact track (so we may add it to their list). */
+export async function hasListened(userId: string, trackId: string) {
+  const db = await getDb();
+  const r = await db
+    .select({ t: schema.listenTops.trackId })
+    .from(schema.listenTops)
+    .where(and(eq(schema.listenTops.userId, userId), eq(schema.listenTops.trackId, trackId)))
+    .limit(1);
+  return r.length > 0;
+}

@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
+import { safeFetchJson } from "@/lib/net";
+import { z } from "zod";
 
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
@@ -17,21 +19,30 @@ export async function GET(request: NextRequest) {
 
   const id = process.env.SPOTIFY_CLIENT_ID!;
   const secret = process.env.SPOTIFY_CLIENT_SECRET!;
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: new URL("/api/spotify/callback", request.url).toString(),
-    }),
-    cache: "no-store",
-  });
-  if (!res.ok) return back("error");
-  const json = (await res.json()) as { refresh_token?: string };
+  if (code.length > 2000) return back("error");
+  let json: { refresh_token?: string; scope?: string };
+  try {
+    ({ data: json } = await safeFetchJson(
+      "https://accounts.spotify.com/api/token",
+      z.object({ refresh_token: z.string().optional(), scope: z.string().optional() }),
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: new URL("/api/spotify/callback", request.url).toString(),
+        }).toString(),
+        retries: 0, // an auth code works once
+        maxBytes: 20_000,
+      },
+    ));
+  } catch {
+    return back("error");
+  }
   if (!json.refresh_token) return back("error");
 
   const db = await getDb();

@@ -602,7 +602,7 @@ body:has(.home) main { max-width: none; padding-left: 0; padding-right: 0; paddi
 }
 
 /* rooms: every other page is a sheet of paper held up in the sky, the world all around it */
-body:not(:has(.home)):not(:has(.monument)) main {
+body:not(:has(.home)):not(:has(.monument)):not(:has(.monthly)) main {
   margin-top: 28px; margin-bottom: 20px;
   width: min(1060px, calc(100% - 20px));
   padding: clamp(18px, 4vw, 40px);
@@ -612,7 +612,7 @@ body:not(:has(.home)):not(:has(.monument)) main {
   rotate: -0.25deg;
   flex: none;
 }
-body:not(:has(.home)):not(:has(.monument)) main > * { rotate: 0.25deg; }
+body:not(:has(.home)):not(:has(.monument)):not(:has(.monthly)) main > * { rotate: 0.25deg; }
 body:has(.join-page) main { width: min(520px, calc(100% - 24px)) !important; margin-top: 7vh !important; rotate: -1.2deg !important; }
 body:has(.join-page) main > * { rotate: 0deg; }
 .footpath { position: relative; z-index: 2; padding: 30px 20px 70px; text-align: center; }
@@ -714,3 +714,89 @@ body:has(.home) .footpath, body:has(.monument) .footpath { display: none; }
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .mon-credit:hover { text-decoration: underline; }
+
+/* ---- live listening on the plaza ---- */
+.mini-live {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.6vh);
+  transform: translateX(-50%) rotate(-2deg);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: max-content;
+  max-width: 15rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.3rem;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #2f281e;
+  font-size: 12px;
+  line-height: 1.15;
+  box-shadow: 0 6px 18px rgba(20, 20, 60, 0.28), 0 0 0 2px #fff inset;
+  animation: live-bob 3.4s ease-in-out infinite;
+  z-index: 3;
+  pointer-events: none;
+}
+.mini-live img { width: 28px; height: 28px; border-radius: 999px; object-fit: cover; flex: none; animation: live-spin 6s linear infinite; }
+.mini-live span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mini-live small { display: block; font-weight: 400; color: #7b6f5c; overflow: hidden; text-overflow: ellipsis; }
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-radius: 999px;
+  background: #1db954;
+  box-shadow: 0 0 0 0 rgba(29, 185, 84, 0.6);
+  animation: live-ping 1.6s ease-out infinite;
+  vertical-align: 1px;
+}
+.mini.is-live .mini-sprite { filter: drop-shadow(0 0 1.4vh rgba(255, 236, 170, 0.85)); }
+@keyframes live-bob { 50% { transform: translateX(-50%) rotate(-2deg) translateY(-4px); } }
+@keyframes live-spin { to { rotate: 360deg; } }
+@keyframes live-ping { 70% { box-shadow: 0 0 0 7px rgba(29, 185, 84, 0); } 100% { box-shadow: 0 0 0 0 rgba(29, 185, 84, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .mini-live, .mini-live img, .live-dot { animation: none; }
+}
+
+/* ---- the monthly list ---- */
+body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
+.monthly { position: relative; z-index: 2; padding-bottom: 20vh; }
+.monthly-hero, .monthly-body { padding: 0 max(20px, calc(50vw - 560px)); }
+.monthly-hero { padding-top: 6vh; padding-bottom: 8vh; }
+.ballot-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; align-items: start; }
+@media (max-width: 860px) { .ballot-grid { grid-template-columns: 1fr; } .ballot { position: static !important; order: -1; } }
+.pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 22px 18px; }
+.pool-card { display: flex; flex-direction: column; background: #fff; padding: 10px 10px 12px; box-shadow: 0 22px 40px -24px rgba(10, 20, 80, 0.7); transition: translate 0.2s, box-shadow 0.2s; color: #2f281e; }
+.pool-card b { margin-top: 8px; font-family: var(--font-garamond); font-size: 17px; line-height: 1.15; }
+.pool-card small { color: #7b6f5c; font-size: 13px; }
+.pool-card .sticker { font-size: 10.5px; }
+.pool-card.is-ranked { translate: 0 -4px; box-shadow: 0 0 0 3px var(--coral), 0 26px 40px -24px rgba(10, 20, 80, 0.8); }
+.pool-art { position: relative; display: block; aspect-ratio: 1; width: 100%; overflow: hidden; cursor: pointer; }
+.pool-art img { width: 100%; height: 100%; object-fit: cover; }
+.pool-badge { position: absolute; right: 6px; top: 6px; min-width: 34px; height: 34px; padding: 0 8px; display: grid; place-items: center; border-radius: 999px; background: rgba(255, 250, 240, 0.95); color: #2f281e; font-family: var(--font-tall); font-size: 17px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); transition: transform 0.18s cubic-bezier(.3, 1.6, .5, 1); }
+.pool-art:hover .pool-badge { transform: scale(1.12); }
+.is-ranked .pool-badge { background: var(--coral); color: #fff; }
+.ballot { position: sticky; top: 90px; background: var(--paper); color: #2f281e; padding: 18px 18px 20px; border-radius: 4px; box-shadow: 0 26px 50px -24px rgba(15, 25, 80, 0.7); rotate: 0.6deg; }
+.ballot-row { display: flex; align-items: center; gap: 10px; padding: 6px 6px; border-radius: 6px; background: #fff; box-shadow: 0 1px 0 #e6dcc8; cursor: grab; touch-action: none; }
+.ballot-row.is-dragging { position: relative; z-index: 5; box-shadow: 0 16px 30px -12px rgba(0, 0, 0, 0.4); cursor: grabbing; }
+.ballot-num { width: 22px; text-align: right; font-family: var(--font-tall); font-size: 18px; color: var(--coral); }
+.podium { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 20px; align-items: end; max-width: 900px; }
+.podium-step { display: flex; flex-direction: column; align-items: center; text-align: center; background: var(--paper); color: #2f281e; padding: 14px 14px 18px; box-shadow: 0 26px 50px -24px rgba(15, 25, 80, 0.75); position: relative; }
+.podium-step img { width: 100%; aspect-ratio: 1; object-fit: cover; }
+.podium-step b { margin-top: 10px; font-family: var(--font-garamond); font-size: 20px; line-height: 1.1; }
+.podium-step small { color: #7b6f5c; }
+.podium-1 { order: 2; rotate: -0.8deg; }
+.podium-1 b { font-size: 26px; }
+.podium-2 { order: 1; rotate: 1.4deg; }
+.podium-3 { order: 3; rotate: -1.6deg; }
+.podium-num { position: absolute; top: -18px; left: 50%; translate: -50% 0; background: var(--klein); color: #fff; font-family: var(--font-roman, serif); letter-spacing: 0.15em; padding: 4px 14px; border-radius: 999px; box-shadow: 0 0 0 2px #fff; }
+.podium-score { margin-top: 8px; font-family: var(--font-tall); font-size: 28px; color: var(--coral); }
+@media (max-width: 640px) { .podium { grid-template-columns: 1fr; } .podium-1, .podium-2, .podium-3 { order: 0; } }
+.score-bar { display: block; height: 8px; border-radius: 99px; background: #eee5d3; position: relative; overflow: hidden; }
+.score-bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--coral); border-radius: 99px; }
+@media (max-width: 560px) {
+  .pool { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+  .pool-card b { font-size: 15px; }
+  .pool-card .sticker { font-size: 9.5px; white-space: normal; }
+}

@@ -15,8 +15,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/me/import
         {kind === "on_deck" ? "Bring in your On Deck list" : "Bring in your all-time list"}
       </h1>
       <p className="mt-3 text-muted">
-        Copy the playlist from Spotify and paste it here. The playlist&apos;s order becomes your ranking, so put your #1 at the
-        top. You can reorder and add stories after.
+        Make a Spotify playlist in your order, #1 at the top, and paste its link here. You can reorder and add stories after.
       </p>
       <ImportClient kind={kind} handle={user.handle} />
     </div>

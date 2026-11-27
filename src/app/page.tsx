@@ -19,6 +19,8 @@ import { carvedTitle } from "@/lib/monument";
 import { setupCrew } from "./actions";
 import { after } from "next/server";
 import { backfillTracks } from "@/lib/spotify";
+import { getAccounts, getLiveNow, heavyRotation, refreshListening, visibility } from "@/lib/listening";
+import { compact } from "@/lib/time";
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -32,8 +34,18 @@ export default async function Home() {
     getSocial(user.crewId, user.id),
   ]);
   const mine = overview.find((o) => o.member.id === user.id);
-  const reacts = await getReactions(feed.map((f) => movesTarget(f.batchId)), user.id);
-  after(() => backfillTracks());
+  const [reacts, live, rotation, accts] = await Promise.all([
+    getReactions(feed.map((f) => movesTarget(f.batchId)), user.id),
+    getLiveNow(user.crewId, 0), // cache only during render; the browser asks for fresh data
+    heavyRotation(user.crewId),
+    getAccounts(overview.map((o) => o.member.id)),
+  ]);
+  const liveEnabled = [...accts.values()].some((a) => visibility(a).live);
+  const linked = accts.has(user.id);
+  after(async () => {
+    await backfillTracks();
+    if (linked) await refreshListening(user.id, { only: ["weeks", "months", "profile"] });
+  });
   const members: GroundMember[] = overview.map(({ member, count, top }) => ({
     name: member.name,
     handle: member.handle,
@@ -50,7 +62,7 @@ export default async function Home() {
     <div className="home">
       {/* first you walk along the plaza, then scrolling lifts you off the sand into the sky */}
       <Altitude stops={[{ y: 0, alt: 0 }, { y: walk, alt: 0 }, { y: walk + 1, alt: 0.3125 }, { y: "end", alt: 0.92 }]} />
-      <Promenade members={members} ghosts={ghosts}>
+      <Promenade members={members} ghosts={ghosts} live={live} liveEnabled={liveEnabled}>
         <div className="hero">
           <p className="sticker sticker-blue -rotate-2">{crew.name}</p>
           <h1 className="hero-line">
@@ -148,6 +160,52 @@ export default async function Home() {
           )}
         </section>
 
+        <section>
+          <h2 className="tall-h">
+            On repeat <span className="sticker sticker-paper rotate-2">last 4 weeks</span>
+          </h2>
+          <p className="tall-sub">What everyone actually can&apos;t stop playing. Rankings are what you say; this is what you do.</p>
+          {rotation.length === 0 ? (
+            <p className="paper-note">
+              {linked ? "Nobody else has linked stats.fm yet." : "Link stats.fm in "}
+              {!linked && <Link href="/settings#statsfm" className="underline">Settings</Link>}
+              {!linked && " and your heavy rotation shows up here, next to everyone else's."}
+            </p>
+          ) : (
+            <div className="rail">
+              {rotation.map((r, i) => {
+                const mineToo = r.user.id === user.id;
+                return (
+                  <div key={`${r.user.id}-${r.track.id}`} className="loot" style={{ rotate: `${((i * 53) % 5) - 2}deg` }}>
+                    {r.track.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.track.imageUrl} alt="" className="loot-art" />
+                    )}
+                    <b>{carvedTitle(r.track.name)}</b>
+                    <small>{artistLine(r.track.artists)}</small>
+                    <span className="mt-2 flex flex-wrap items-center gap-1">
+                      <Link href={`/u/${r.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: r.user.color }}>
+                        {mineToo ? "You" : r.user.name}
+                      </Link>
+                      <span className="sticker sticker-paper">{compact(r.streams)} plays</span>
+                    </span>
+                    {!mineToo && !social.has(r.track) && (
+                      <span className="mt-2">
+                        <StealButton trackId={r.track.id} fromUserId={r.user.id} />
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {rotation.length > 0 && (
+            <p className="mt-3 text-xs text-muted">
+              Play counts from <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="underline">stats.fm</a>, for people who linked it.
+            </p>
+          )}
+        </section>
+
         <section id="invite">
           <h2 className="tall-h">Doors</h2>
           <p className="tall-sub">Every room in the place.</p>
@@ -155,6 +213,7 @@ export default async function Home() {
             width={240}
             doors={[
               { href: `/u/${user.handle}`, label: "Your column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
+              { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea", inside: <span className="portal-word">♪</span> },
               { href: "/compare", label: "Compare", sub: "you vs anyone", tone: "dawn", inside: <span className="portal-word">VS</span> },
               { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea", inside: <span className="portal-word">“ ”</span> },
               { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night", inside: <span className="portal-word">+</span> },

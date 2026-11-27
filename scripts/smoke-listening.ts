@@ -1,9 +1,9 @@
 import { getDb, schema } from "@/db";
-import { eq } from "drizzle-orm";
 import { connectStatsfm, refreshListening, getPlays, getTop, getAccount, fetchMonth, monthKeyOf, getLive } from "@/lib/listening";
 import { ensureRound, refreshPool, getPool, saveBallot, nominate } from "@/lib/monthly";
 
 async function main() {
+  if (!process.env.PGLITE_DIR?.startsWith("/tmp/")) throw new Error("set PGLITE_DIR to a scratch copy under /tmp");
   const db = await getDb();
   const users = await db.select().from(schema.users);
   console.log("users", users.map((u) => u.handle));

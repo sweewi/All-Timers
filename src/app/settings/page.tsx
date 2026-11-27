@@ -5,7 +5,7 @@ import { getCrewMembers } from "@/lib/lists";
 import { signOut } from "@/app/actions";
 import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
-import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails } from "./actions";
+import { makeLoginLinkFor, makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
 import { ActionButton } from "./ActionButton";
 import { Altitude } from "@/components/World";
 import { StatsfmPanel, type StatsfmView } from "./StatsfmPanel";
@@ -94,8 +94,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             ) : (
               <>
                 <p className="text-sm text-muted">
-                  Song lookups use the app&apos;s Spotify keys. Connecting your own account is a backup for lookups and is
-                  needed later to create the group&apos;s monthly playlists on your account.
+                  Song lookups use the app&apos;s Spotify keys. Connecting your own account makes it the group&apos;s playlist hub:
+                  every column and every finished month becomes a playlist on your account, kept in order, that anyone can follow.
                 </p>
                 <div className="flex items-center gap-3">
                   <a href="/api/spotify/login" className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent">
@@ -104,6 +104,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   {spotifyConnected && <span className="text-sm text-green-700">Connected</span>}
                   {sp.spotify === "error" && <span className="text-sm text-red-700">That didn&apos;t work. Try again.</span>}
                 </div>
+                {spotifyConnected && (
+                  <div className="flex items-center gap-3 pt-2">
+                    <ActionButton run={syncSpotifyMirrors} label="Sync playlists now" />
+                    <span className="text-xs text-muted">They also sync on every save and once a day.</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 pt-2">
                   <ActionButton run={refreshSongDetails} label="Refresh song details" />
                   <span className="text-xs text-muted">Fills in artist, album and version for songs added before the keys were set.</span>

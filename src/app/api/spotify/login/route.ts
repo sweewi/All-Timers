@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   if (!user?.isAdmin || !clientId) return NextResponse.redirect(new URL("/settings", request.url));
   const state = newToken(16);
-  (await cookies()).set("spotify_state", state, { httpOnly: true, sameSite: "lax", maxAge: 600, path: "/" });
+  (await cookies()).set("spotify_state", state, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600, path: "/api/spotify" });
   const redirectUri = new URL("/api/spotify/callback", request.url).toString();
   const url = new URL("https://accounts.spotify.com/authorize");
   url.search = new URLSearchParams({

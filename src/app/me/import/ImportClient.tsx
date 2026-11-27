@@ -9,6 +9,8 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
   const router = useRouter();
   const [isMac, setIsMac] = useState(true);
   const [text, setText] = useState("");
+  const [link, setLink] = useState("");
+  const [showLinks, setShowLinks] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -25,12 +27,9 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
       try {
         const res = await previewImport(value, kind);
         setPreview(res);
-        if (res.tracks.length === 0) {
-          setError(
-            res.playlists
-              ? "That's a playlist link. Spotify won't let apps read other people's playlists, so copy the songs themselves (steps above)."
-              : "No song links found. Follow the steps above and paste again.",
-          );
+        if (res.error) setError(res.error);
+        else if (res.tracks.length === 0) {
+          setError(res.playlists ? "That playlist has no songs we can read." : "No Spotify links found there. Paste a playlist link or song links.");
         }
       } catch {
         setError("Something went wrong reading those links. Try again.");
@@ -50,9 +49,61 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
 
   return (
     <div className="mt-8 space-y-8">
+      <div className="rounded-2xl border border-line bg-surface p-5">
+        <div className="font-medium">Paste your playlist&apos;s link</div>
+        <p className="mt-1 text-sm text-muted">
+          In Spotify, open the playlist → ••• (or Share) → <b>Copy link to playlist</b>. Works from your phone. The playlist must be public.
+        </p>
+        <form
+          className="mt-3 flex flex-wrap gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            runPreview(link);
+          }}
+        >
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://open.spotify.com/playlist/…"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={500}
+            className="min-w-0 flex-1 basis-full rounded-full border border-line bg-background px-4 py-2 text-sm outline-none focus:border-accent sm:basis-auto"
+          />
+          <button
+            type="button"
+            className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent"
+            onClick={async () => {
+              try {
+                const t = (await navigator.clipboard?.readText())?.trim().slice(0, 500);
+                if (t) {
+                  setLink(t);
+                  runPreview(t);
+                }
+              } catch {
+                setError("Couldn't read the clipboard. Paste the link into the box instead.");
+              }
+            }}
+          >
+            Paste from clipboard
+          </button>
+          <button disabled={!link.trim() || pending} className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-black disabled:opacity-40">
+            {pending ? "Reading…" : "Read playlist"}
+          </button>
+        </form>
+        {error && !showLinks && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      </div>
+
+      <button type="button" onClick={() => setShowLinks((v) => !v)} className="text-sm text-muted underline-offset-4 hover:underline">
+        {showLinks ? "Hide" : "Over 100 songs, or a private playlist? Paste the songs instead"}
+      </button>
+
+      {showLinks && (
+        <>
       <ol className="grid gap-3 sm:grid-cols-2">
         <Step n={1} title="Open the Spotify desktop app">
-          On a computer, open the playlist with your list. (Phone can&apos;t copy a whole playlist; see below.)
+          On a computer, open the playlist with your list.
         </Step>
         <Step n={2} title="Click any song once">
           Just select it, don&apos;t play it.
@@ -89,15 +140,31 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
           >
             {pending ? "Reading…" : "Read links"}
           </button>
-          <span className="text-xs text-muted">
-            On your phone instead? In Spotify tap ••• on a song → Share → Copy link, and paste here one at a time.
-          </span>
         </div>
         {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
       </div>
+        </>
+      )}
 
       {preview && preview.tracks.length > 0 && (
         <div className="rounded-2xl border border-line bg-surface p-5">
+          {preview.playlist && (
+            <div className="mb-4 flex items-center gap-3">
+              {preview.playlist.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview.playlist.imageUrl} alt="" className="h-14 w-14 rounded object-cover" />
+              )}
+              <div>
+                <div className="font-medium">{preview.playlist.name}</div>
+                {preview.playlist.truncated && (
+                  <div className="text-sm text-red-700">
+                    Spotify only shows the first {preview.tracks.length} of {preview.playlist.total ?? "its"} songs this way. Save these, then
+                    paste the rest as song links (button above) with &ldquo;Add to the bottom&rdquo;.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <div className="font-medium">{preview.tracks.length} songs found</div>
             <div className="text-sm text-muted">
@@ -130,6 +197,12 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
               </li>
             ))}
           </ol>
+          {preview.diff.current > 0 && (
+            <p className="mt-4 text-sm text-muted">
+              Replacing keeps this order: {preview.diff.added} new, {preview.diff.removed} of your current {preview.diff.current} would drop off.
+              Adding to the bottom keeps your list and appends the {preview.diff.added} new ones.
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
@@ -137,7 +210,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
               disabled={pending}
               className="rounded-full bg-accent px-5 py-2 font-medium text-black disabled:opacity-50"
             >
-              Save as my {kind === "on_deck" ? "On Deck" : "All-Time"} list
+              {preview.diff.current ? "Replace" : "Save as"} my {kind === "on_deck" ? "On Deck" : "All-Time"} list
             </button>
             <button
               type="button"

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { MonthlyRound, Track } from "@/db/schema";
 import { newId } from "./ids";
@@ -16,6 +16,11 @@ export function phaseOf(round: Pick<MonthlyRound, "month" | "status">, now = Dat
   if (round.status === "revealed") return { phase: "revealed" as const, reveal };
   if (now >= reveal) return { phase: "due" as const, reveal };
   return { phase: "open" as const, reveal };
+}
+
+/** The pool is rebuilt from fresh plays at most every few hours. */
+export function poolIsStale(round: Pick<MonthlyRound, "poolBuiltAt">, now = Date.now()) {
+  return !round.poolBuiltAt || now - round.poolBuiltAt.getTime() > 3 * 3_600_000;
 }
 
 /** The round for this crew and month, created on first sight. */
@@ -232,4 +237,3 @@ export async function poolTrackIds(roundId: string) {
   return rows.map((r) => r.trackId);
 }
 
-export { inArray };

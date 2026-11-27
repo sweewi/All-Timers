@@ -2,7 +2,32 @@ import "server-only";
 import { eq, inArray, notInArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Track } from "@/db/schema";
+import { z } from "zod";
 import { songKey } from "./songs";
+import { safeFetchJson, safeFetchText } from "./net";
+
+const TokenSchema = z.object({ access_token: z.string().min(10), expires_in: z.number(), refresh_token: z.string().optional() });
+
+async function tokenRequest(body: string) {
+  const id = process.env.SPOTIFY_CLIENT_ID!;
+  const secret = process.env.SPOTIFY_CLIENT_SECRET!;
+  try {
+    const { data } = await safeFetchJson("https://accounts.spotify.com/api/token", TokenSchema, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+      retries: 1,
+      maxBytes: 20_000,
+    });
+    return data;
+  } catch (e) {
+    console.error("spotify token", { err: e instanceof Error ? e.message : String(e) });
+    return null;
+  }
+}
 
 /** Pull Spotify track IDs out of whatever people paste, in order, keeping duplicates out. */
 export function parseTrackInput(text: string) {
@@ -42,17 +67,8 @@ async function getAppToken() {
   const secret = process.env.SPOTIFY_CLIENT_SECRET;
   if (!id || !secret) return null;
   if (appToken && appToken.expires > Date.now() + 60_000) return appToken.value;
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { access_token: string; expires_in: number };
+  const json = await tokenRequest("grant_type=client_credentials");
+  if (!json) return null;
   appToken = { value: json.access_token, expires: Date.now() + json.expires_in * 1000 };
   return appToken.value;
 }
@@ -67,17 +83,8 @@ export async function getOwnerToken() {
   const db = await getDb();
   const row = (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token")))[0];
   if (!row) return null;
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: row.value }),
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { access_token: string; expires_in: number; refresh_token?: string };
+  const json = await tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: row.value }).toString());
+  if (!json) return null;
   if (json.refresh_token && json.refresh_token !== row.value) {
     await db
       .update(schema.settings)
@@ -97,23 +104,39 @@ type SpotifyTrack = {
   external_ids?: { isrc?: string };
 };
 
+const ApiTrackSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  artists: z.array(z.object({ name: z.string() })),
+  album: z.object({
+    name: z.string(),
+    release_date: z.string().optional(),
+    images: z.array(z.object({ url: z.string(), width: z.number().nullable().transform((w) => w ?? 0) })).optional(),
+  }),
+  duration_ms: z.number(),
+  external_ids: z.object({ isrc: z.string().optional() }).optional(),
+});
+
 async function fetchFromApi(id: string, token: string): Promise<SpotifyTrack | null> {
-  const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as SpotifyTrack;
+  try {
+    const { data } = await safeFetchJson(`https://api.spotify.com/v1/tracks/${id}`, ApiTrackSchema, {
+      headers: { Authorization: `Bearer ${token}` },
+      retries: 1,
+      maxBytes: 200_000,
+    });
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchFromOEmbed(id: string) {
   try {
-    const res = await fetch(
+    const { data: json } = await safeFetchJson(
       `https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/track/${id}`)}`,
-      { cache: "no-store" },
+      z.object({ title: z.string().optional(), thumbnail_url: z.string().optional() }),
+      { retries: 1, maxBytes: 50_000 },
     );
-    if (!res.ok) return null;
-    const json = (await res.json()) as { title?: string; thumbnail_url?: string };
     return json.title ? { title: json.title, image: json.thumbnail_url ?? null } : null;
   } catch {
     return null;
@@ -158,11 +181,10 @@ const decodeHtml = (s: string) =>
 async function fetchFromPublicPages(id: string): Promise<PageTrack | null> {
   try {
     const [embedRes, pageRes] = await Promise.all([
-      fetch(`https://open.spotify.com/embed/track/${id}`, { headers: BROWSER_HEADERS, cache: "no-store" }),
-      fetch(`https://open.spotify.com/track/${id}`, { headers: BROWSER_HEADERS, cache: "no-store" }).catch(() => null),
+      safeFetchText(`https://open.spotify.com/embed/track/${id}`, { headers: BROWSER_HEADERS, retries: 1 }),
+      safeFetchText(`https://open.spotify.com/track/${id}`, { headers: BROWSER_HEADERS, retries: 1 }).catch(() => null),
     ]);
-    if (!embedRes.ok) return null;
-    const html = await embedRes.text();
+    const html = embedRes.text;
     const m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     if (!m) return null;
     const entity = JSON.parse(m[1])?.props?.pageProps?.state?.data?.entity;
@@ -174,8 +196,8 @@ async function fetchFromPublicPages(id: string): Promise<PageTrack | null> {
     const iso: string | undefined = entity.releaseDate?.isoString;
 
     let album = "";
-    if (pageRes?.ok) {
-      const page = await pageRes.text();
+    if (pageRes) {
+      const page = pageRes.text;
       const desc = page.match(/<meta property="og:description" content="([^"]*)"/)?.[1];
       if (desc) {
         // "Artist A, Artist B · Album Name · Song · 1987"

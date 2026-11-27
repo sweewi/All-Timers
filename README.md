@@ -33,9 +33,10 @@ With no `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite` (create
    - API: **Web API**.
    - In Vercel → Settings → Environment Variables add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`, then redeploy.
 4. **Open the site**, create the crew (you become admin), and import your list.
-5. **Settings → Connect my Spotify** (admin, optional now). This is the backup for song lookups and is needed for the monthly group playlists.
-6. **Settings → Refresh song details** if you imported songs before adding the Spotify keys.
-7. Copy the invite link from the home page and send it to the group.
+5. **Settings → Connect my Spotify** (admin, optional). Your account becomes the group's playlist hub: every column and every finished month is kept as a playlist there, in order, that anyone can follow. Spotify's development mode allows only 5 signed-in users per app, which is why the hub is one account rather than everyone's.
+6. **Cron secret.** Add `CRON_SECRET` (any random string of 16+ characters, e.g. `openssl rand -hex 24`). Vercel sends it to `/api/cron/daily` once a day (see `vercel.json`); without it the route refuses every call.
+7. **Settings → Refresh song details** if you imported songs before adding the Spotify keys.
+8. Copy the invite link from the home page and send it to the group.
 
 ## Environment variables
 
@@ -44,11 +45,41 @@ With no `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite` (create
 | `DATABASE_URL` | Production | Neon Postgres connection string (set by the Vercel Neon integration) |
 | `SPOTIFY_CLIENT_ID` | Optional | ISRC lookups and the owner's Spotify connection (needed for group playlists later) |
 | `SPOTIFY_CLIENT_SECRET` | Optional | Same |
+| `CRON_SECRET` | Production | Bearer secret for the daily job (listening refresh, monthly reveal, playlist sync, cleanup) |
+| `APP_TIMEZONE` | No | IANA zone for calendar months and the 8 pm reveal (default `America/New_York`) |
 | `PGLITE_DIR` | No | Where the local embedded database lives (default `./.pglite`) |
+
+## Listening data (stats.fm)
+
+Members can link their [stats.fm](https://stats.fm) profile in Settings (username or profile link). It's opt-in, the stats.fm privacy settings always win, and unlinking deletes everything we cached. With it:
+
+- columns show lifetime play counts per song ("412 plays", or "under 10 plays" past the top 1,000)
+- the plaza shows who's playing what right now (polled about once a minute while the page is open)
+- **On repeat**: everyone's most-played of the last four weeks, stealable
+- **You keep playing these**: songs you replay that aren't on your lists, on the On Deck page
+- **The monthly list** (`/month`): each person's top 5 by plays in the calendar month (weighted so everyone counts equally) plus up to 3 nominations each; everyone ranks a secret ballot; the group list is revealed at 8 pm on the last day (averaged Borda count) and mirrored to the Spotify hub
+
+Being a good guest to an unofficial API: requests are throttled (2 at a time), cached (4 h to 24 h depending on the data), refreshed after pages render rather than during, backed off on 429, and the site works without it.
+
+## Safety
+
+- Every outbound request goes through `src/lib/net.ts`: host allowlist (Spotify, stats.fm), HTTPS only, redirects re-checked, timeouts, size caps, retries with backoff, per-host circuit breaker
+- Every server action validates its input with zod (`src/lib/guard.ts`) and is rate limited per user (Postgres-backed, so it holds across serverless instances)
+- Security headers and a CSP in `next.config.ts`; `/api/*` is `no-store`
+- Sessions and sign-in links are stored hashed; sign-in links are single use and expire in 24 h
+
+## Tests
+
+```bash
+npm test                                   # pure logic: pool weighting, ballot tally, parsers, month windows
+PGLITE_DIR=/tmp/scratch node --conditions=react-server --import tsx scripts/smoke-reveal.ts   # against a scratch DB copy
+```
 
 ## Code map
 
-- `src/db/schema.ts`: tables (crews, users, sessions, tracks, list_entries, origins, rank_events, settings)
+- `src/db/schema.ts`: tables (crews, users, sessions, tracks, list_entries, origins, rank_events, reactions, settings, statsfm_accounts, listen_tops, listen_syncs, now_playing, monthly_rounds/pool/ballots/results, rate_limits, spotify_mirrors)
+- `src/lib/net.ts` · `guard.ts` · `ratelimit.ts`: the safety layer
+- `src/lib/statsfm.ts` (client) · `listening.ts` (cache + sync) · `monthly-math.ts` (pure) · `monthly.ts` (rounds) · `mirror.ts` (Spotify hub) · `playlist.ts` (one-link import)
 - `src/lib/spotify.ts`: link parsing, track lookups (Spotify API if keys work, plus Spotify's public song pages; oEmbed last), and a backfill that heals title-only songs after pages load
 - `src/lib/lists.ts`: reading and saving lists, change log, crew overview and feed
 - `src/lib/songs.ts`: version and song identity (ISRC vs title + artist)

@@ -7,6 +7,8 @@ import { FOUND_VIA, type FoundVia, type ListKind } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId } from "@/lib/ids";
+import { hasListened } from "@/lib/listening";
+import { queueColumnMirror } from "@/lib/mirror";
 import { budget, parse, zId, zKind, zTrackId, zTrackIds } from "@/lib/guard";
 import { z } from "zod";
 
@@ -19,6 +21,7 @@ export async function saveOrder(kindIn: ListKind, idsIn: string[]) {
   const mine = new Set([...(await getList(user.id, "all_time")), ...(await getList(user.id, "on_deck"))].map((e) => e.track.id));
   if (ids.some((id) => !mine.has(id))) throw new Error("Unknown song in that order.");
   await saveList(user.id, kind, ids);
+  if (kind === "all_time") queueColumnMirror(user.id);
   refresh();
 }
 
@@ -39,6 +42,7 @@ export async function moveToList(trackIdIn: string, fromIn: ListKind, toIn: List
     from,
     src.map((e) => e.track.id).filter((id) => id !== trackId),
   );
+  queueColumnMirror(user.id);
   refresh();
 }
 
@@ -107,4 +111,21 @@ export async function saveOrigin(raw: OriginInput) {
   }
   refresh();
   return { originId: id, inviteName: fromName };
+}
+
+/**
+ * Add a song you've been playing (per stats.fm) to the bottom of a list.
+ * Only tracks we actually saw in your listening are accepted.
+ */
+export async function addFromListening(trackIdIn: string, kindIn: ListKind) {
+  const user = await requireUser();
+  const trackId = parse(zTrackId, trackIdIn);
+  const kind = parse(zKind, kindIn);
+  await budget("write", user.id);
+  if (!(await hasListened(user.id, trackId))) throw new Error("Not in your listening.");
+  const [allTime, onDeck] = await Promise.all([getList(user.id, "all_time"), getList(user.id, "on_deck")]);
+  if ([...allTime, ...onDeck].some((e) => e.track.id === trackId)) return;
+  const target = kind === "all_time" ? allTime : onDeck;
+  await saveList(user.id, kind, [...target.map((e) => e.track.id), trackId]);
+  refresh();
 }
