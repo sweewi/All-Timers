@@ -74,7 +74,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   My column
                 </Link>
                 <Link href="/month" className="text-muted hover:text-foreground">
-                  This month
+                  <span className="sm:hidden">Month</span>
+                  <span className="hidden sm:inline">This month</span>
                 </Link>
                 <Link href="/rate" className="text-muted hover:text-foreground">
                   Ratings

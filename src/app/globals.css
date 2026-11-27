@@ -1224,7 +1224,7 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
 
 /* ratings page */
 .rate-page { padding: 4vh max(20px, calc(50vw - 560px)) 10vh; }
-.rate-page > * { min-width: 0; }
+.rate-page > *, .rate-page section > *, .rate-page .grid > * { min-width: 0; }
 .rate-page .rail { margin-top: 16px; }
 .take-score { display: inline-block; min-width: 2.4em; padding: 0 0.35em; border-radius: 4px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: #3b2a0c; background: linear-gradient(110deg, #ecca72, #f8e6aa 50%, #dcb253); }
 .hot-take { display: inline-block; margin-left: 0.5em; padding: 0.05em 0.55em; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff4ee; background: linear-gradient(160deg, #d1563a, #a2271c); transform: rotate(-2deg); }

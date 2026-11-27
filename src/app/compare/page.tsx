@@ -106,7 +106,7 @@ async function Comparison({ a, b }: { a: User; b: User }) {
           ]
             .filter((g) => g.rows.length)
             .map((g) => (
-              <div key={g.title}>
+              <div key={g.title} className="min-w-0">
                 <h2 className="rank-num text-3xl">{g.title}</h2>
                 <ul className="mt-4 divide-y divide-line">
                   {g.rows.map((r) => (
@@ -163,12 +163,12 @@ async function Comparison({ a, b }: { a: User; b: User }) {
           <h2 className="rank-num text-3xl">Same song, different version</h2>
           <ul className="mt-4 space-y-4">
             {diffVersion.map(([x, y]) => (
-              <li key={x.track.id} className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
+              <li key={x.track.id} className="grid grid-cols-1 gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
                 {[
                   [a, x],
                   [b, y],
                 ].map(([u, e]) => (
-                  <div key={(u as User).id} className="flex items-center gap-3">
+                  <div key={(u as User).id} className="flex min-w-0 items-center gap-3">
                     <Art track={(e as Entry).track} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 text-xs text-muted">

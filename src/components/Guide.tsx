@@ -523,6 +523,23 @@ const STEPS: Step[] = [
   },
   {
     chapter: "How it works",
+    title: "Rate songs",
+    render: ({ close }) => (
+      <>
+        <div className="guide-art">
+          <span className="rate-chip is-rated" style={{ fontSize: 22 }}>8.4</span>
+        </div>
+        <p>
+          Any song anywhere has a <b>Rate</b> button. Give it a gut call (loved it, fine, not for me), then answer a few quick
+          head-to-heads against songs already rated. The score comes from where it lands, so nobody&apos;s 10 is cheap.
+        </p>
+        <p>Scores show up for the whole group: the takes on the plaza, the group chart, and how closely two people&apos;s taste lines up.</p>
+        <Go href="/rate" label="Start rating" close={close} />
+      </>
+    ),
+  },
+  {
+    chapter: "How it works",
     title: "Compare",
     render: ({ close }) => (
       <>
