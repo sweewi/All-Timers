@@ -4,6 +4,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
 import type { ListKind, Origin, Track, User } from "@/db/schema";
 import { newId } from "./ids";
+import { inGroup } from "./groups";
 
 export type Entry = {
   position: number;
@@ -96,9 +97,16 @@ export async function saveList(userId: string, kind: ListKind, trackIds: string[
   return { changed: true };
 }
 
+/** Everyone in the group, with `isAdmin` meaning admin of this group. */
 export async function getCrewMembers(crewId: string) {
   const db = await getDb();
-  return db.select().from(schema.users).where(eq(schema.users.crewId, crewId)).orderBy(asc(schema.users.createdAt));
+  const rows = await db
+    .select({ user: schema.users, role: schema.memberships.role, joinedAt: schema.memberships.joinedAt })
+    .from(schema.memberships)
+    .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+    .where(eq(schema.memberships.crewId, crewId))
+    .orderBy(asc(schema.memberships.joinedAt));
+  return rows.map((r) => ({ ...r.user, isAdmin: r.role === "admin" }));
 }
 
 /** Each member's list length and #1 song, for the crew home page. */
@@ -143,7 +151,7 @@ export async function getCrewFeed(crewId: string, limit = 25): Promise<FeedItem[
     .from(schema.rankEvents)
     .innerJoin(schema.users, eq(schema.users.id, schema.rankEvents.userId))
     .innerJoin(schema.tracks, eq(schema.tracks.id, schema.rankEvents.trackId))
-    .where(eq(schema.users.crewId, crewId))
+    .where(inGroup(crewId))
     .orderBy(desc(schema.rankEvents.createdAt))
     .limit(400);
 

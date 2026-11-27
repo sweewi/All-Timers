@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { isSiteAdmin } from "@/lib/groups";
 import { newToken } from "@/lib/ids";
 import { SPOTIFY_SCOPES } from "@/lib/spotify";
 
@@ -8,7 +9,7 @@ import { SPOTIFY_SCOPES } from "@/lib/spotify";
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   const clientId = process.env.SPOTIFY_CLIENT_ID;
-  if (!user?.isAdmin || !clientId) return NextResponse.redirect(new URL("/settings", request.url));
+  if (!user || !(await isSiteAdmin(user.id)) || !clientId) return NextResponse.redirect(new URL("/settings", request.url));
   const state = newToken(16);
   (await cookies()).set("spotify_state", state, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600, path: "/api/spotify" });
   const redirectUri = new URL("/api/spotify/callback", request.url).toString();

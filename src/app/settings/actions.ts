@@ -11,6 +11,7 @@ import { budget, parse, zId } from "@/lib/guard";
 import { RateLimited } from "@/lib/ratelimit";
 import { mirrorCrew, syncMonth } from "@/lib/mirror";
 import { rebuildCurrentPool } from "@/lib/monthly";
+import { adminCount, getMembership, isSiteAdmin, myGroups } from "@/lib/groups";
 import { connectStatsfm, disconnectStatsfm, refreshListening, setSwitches } from "@/lib/listening";
 
 export async function makeMyLoginLink() {
@@ -31,10 +32,10 @@ export async function makeLoginLinkFor(userIdIn: string) {
   return createLoginLink(member.id);
 }
 
-/** Admin only: re-look-up songs that were saved before Spotify keys were set (title-only data). */
+/** Site admin only: re-look-up songs that were saved before Spotify keys were set (title-only data). */
 export async function refreshSongDetails() {
   const admin = await requireUser();
-  if (!admin.isAdmin) throw new Error("Not allowed");
+  if (!(await isSiteAdmin(admin.id))) throw new Error("Not allowed");
   const db = await getDb();
   const partial = await db.select({ id: schema.tracks.id }).from(schema.tracks).where(ne(schema.tracks.metaSource, "spotify"));
   const ids = partial.map((t) => t.id);
@@ -103,7 +104,7 @@ export async function refreshStatsfmNow(): Promise<string> {
   return r.refreshed.length ? "Up to date" : "stats.fm didn't answer. We'll try again later.";
 }
 
-/** Admin only: push every month's playlist to the Spotify hub now. */
+/** Admin only: push this group's monthly playlists to the Spotify hub now. */
 export async function syncSpotifyMirrors(): Promise<string> {
   const admin = await requireUser();
   if (!admin.isAdmin) throw new Error("Not allowed");
@@ -125,33 +126,52 @@ async function requireAdminOver(memberIdIn: string) {
   await budget("write", admin.id);
   const db = await getDb();
   const member = (await db.select().from(schema.users).where(eq(schema.users.id, memberId)))[0];
-  if (!member || member.crewId !== admin.crewId) throw new Error("Not found");
+  // admins act only on people in the group they're running
+  if (!member || !(await getMembership(member.id, admin.crewId))) throw new Error("Not found");
   return { admin, member, db };
 }
 
 export async function setAdmin(memberId: string, makeAdmin: boolean): Promise<{ ok: boolean; message: string }> {
   const { admin, member, db } = await requireAdminOver(memberId);
   const on = parse(z.boolean(), makeAdmin);
-  if (!on) {
-    const admins = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.crewId, admin.crewId), eq(schema.users.isAdmin, true)));
-    if (admins.length <= 1 && admins[0]?.id === member.id) return { ok: false, message: "There has to be at least one admin." };
+  if (!on && (await getMembership(member.id, admin.crewId))?.role === "admin" && (await adminCount(admin.crewId)) <= 1) {
+    return { ok: false, message: "There has to be at least one admin." };
   }
-  await db.update(schema.users).set({ isAdmin: on }).where(eq(schema.users.id, member.id));
+  await db
+    .update(schema.memberships)
+    .set({ role: on ? "admin" : "member" })
+    .where(and(eq(schema.memberships.userId, member.id), eq(schema.memberships.crewId, admin.crewId)));
   refresh();
   return { ok: true, message: on ? `${member.name} is now an admin.` : `${member.name} is no longer an admin.` };
 }
 
 /**
- * Remove a member and everything they made: their lists, stories, moves, reactions,
- * listening data, ballots and sessions (signed out everywhere). Credits they gave
- * others ("put on by") become anonymous. The admin must type the member's name.
+ * Remove someone from this group: they stop seeing it and it stops seeing them, and
+ * their votes in its monthly lists go. If this was their only group, their account
+ * and everything they made goes too (lists, stories, moves, reactions, listening
+ * data, sessions); credits they gave others become anonymous. Typed-name confirmation.
  */
 export async function removeMember(memberId: string, typedName: string): Promise<{ ok: boolean; message: string }> {
   const { admin, member, db } = await requireAdminOver(memberId);
   if (member.id === admin.id) return { ok: false, message: "You can't remove yourself." };
   const typed = parse(z.string().max(100), typedName).trim().toLowerCase();
   if (typed !== member.name.trim().toLowerCase()) return { ok: false, message: `Type "${member.name}" to confirm.` };
+  const groups = await myGroups(member.id);
+  const elsewhere = groups.some((g) => g.crew.id !== admin.crewId);
   await db.transaction(async (tx) => {
+    const rounds = await tx.select({ id: schema.monthlyRounds.id }).from(schema.monthlyRounds).where(eq(schema.monthlyRounds.crewId, admin.crewId));
+    if (rounds.length) {
+      await tx
+        .delete(schema.monthlyBallots)
+        .where(and(eq(schema.monthlyBallots.userId, member.id), inArray(schema.monthlyBallots.roundId, rounds.map((r) => r.id))));
+    }
+    await tx.delete(schema.memberships).where(and(eq(schema.memberships.userId, member.id), eq(schema.memberships.crewId, admin.crewId)));
+    if (elsewhere) {
+      // still in another group: their list lives on there; point them at it
+      const next = groups.find((g) => g.crew.id !== admin.crewId)!;
+      if (member.crewId === admin.crewId) await tx.update(schema.users).set({ crewId: next.crew.id }).where(eq(schema.users.id, member.id));
+      return;
+    }
     // reactions point at their songs and moves by key, not by foreign key, so clear them by hand
     const batches = await tx.selectDistinct({ b: schema.rankEvents.batchId }).from(schema.rankEvents).where(eq(schema.rankEvents.userId, member.id));
     await tx.delete(schema.reactions).where(like(schema.reactions.target, `song:${member.id}:%`));
@@ -159,7 +179,7 @@ export async function removeMember(memberId: string, typedName: string): Promise
       const keys = batches.slice(i, i + 200).map((x) => `moves:${x.b}`);
       await tx.delete(schema.reactions).where(inArray(schema.reactions.target, keys));
     }
-    // everything else is tied to the member row and goes with it
+    // everything else is tied to the person and goes with them
     await tx.delete(schema.users).where(eq(schema.users.id, member.id));
   });
   after(async () => {
@@ -167,7 +187,10 @@ export async function removeMember(memberId: string, typedName: string): Promise
     await syncMonth(round.id);
   });
   refresh();
-  return { ok: true, message: `${member.name} was removed.` };
+  return {
+    ok: true,
+    message: elsewhere ? `${member.name} was removed from this group (their other groups keep them).` : `${member.name} was removed.`,
+  };
 }
 
 /** Admin only: rename the group (shown on the plaza, invites, and the monthly playlist). */

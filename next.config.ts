@@ -17,7 +17,8 @@ const IMG_HOSTS = [
  */
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+  // Vercel Speed Insights serves its script from this site in production, from Vercel's CDN in development
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval' https://va.vercel-scripts.com" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${IMG_HOSTS.join(" ")}`,
   "font-src 'self' data:",

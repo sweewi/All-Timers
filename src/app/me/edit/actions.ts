@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId } from "@/lib/ids";
 import { hasListened } from "@/lib/listening";
+import { shareAGroup } from "@/lib/groups";
 import { budget, parse, zId, zKind, zTrackId, zTrackIds } from "@/lib/guard";
 import { z } from "zod";
 
@@ -79,7 +80,7 @@ export async function saveOrigin(raw: OriginInput) {
   let fromUserId = foundVia === "friend" ? input.fromUserId || null : null;
   if (fromUserId) {
     const giver = (await db.select().from(schema.users).where(eq(schema.users.id, fromUserId)))[0];
-    if (!giver || giver.crewId !== user.crewId || giver.id === user.id) fromUserId = null;
+    if (!giver || giver.id === user.id || !(await shareAGroup(user.id, giver.id))) fromUserId = null;
   }
   const fromName = foundVia === "someone" ? input.fromName?.trim().slice(0, 60) || null : null;
   const clean = (s: string) => s.trim().slice(0, 2000) || null;

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import type { User } from "@/db/schema";
 import { getAccount, monthKeyOf } from "./listening";
 import { getRound } from "./monthly";
+import { inGroup } from "./groups";
 
 /** Where this person is with setup, for the guide's checklist. Cheap counts only. */
 export async function guideStatus(user: User) {
@@ -19,7 +20,7 @@ export async function guideStatus(user: User) {
     getAccount(user.id),
     getRound(user.crewId, monthKeyOf()),
     db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)),
-    db.select({ n: count() }).from(schema.users).where(eq(schema.users.crewId, user.crewId)),
+    db.select({ n: count() }).from(schema.users).where(inGroup(user.crewId)),
   ]);
   const voted = round
     ? (await db.select({ n: count() }).from(schema.monthlyBallots).where(and(eq(schema.monthlyBallots.roundId, round.id), eq(schema.monthlyBallots.userId, user.id))))[0].n > 0

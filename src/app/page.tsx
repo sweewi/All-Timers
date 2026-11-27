@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCrewFeed, getCrewOverview, type FeedItem } from "@/lib/lists";
@@ -21,6 +21,8 @@ import { after } from "next/server";
 import { backfillTracks } from "@/lib/spotify";
 import { getAccounts, getLiveNow, heavyRotation, refreshListening, visibility } from "@/lib/listening";
 import { compact } from "@/lib/time";
+import { myGroups } from "@/lib/groups";
+import { GroupSticker } from "@/components/GroupSticker";
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -34,11 +36,12 @@ export default async function Home() {
     getSocial(user.crewId, user.id),
   ]);
   const mine = overview.find((o) => o.member.id === user.id);
-  const [reacts, live, rotation, accts] = await Promise.all([
+  const [reacts, live, rotation, accts, groups] = await Promise.all([
     getReactions(feed.map((f) => movesTarget(f.batchId)), user.id),
     getLiveNow(user.crewId, 0), // cache only during render; the browser asks for fresh data
     heavyRotation(user.crewId),
     getAccounts(overview.map((o) => o.member.id)),
+    myGroups(user.id),
   ]);
   const liveEnabled = [...accts.values()].some((a) => visibility(a).live);
   const linked = accts.has(user.id);
@@ -64,7 +67,7 @@ export default async function Home() {
       <Altitude stops={[{ y: 0, alt: 0 }, { y: walk, alt: 0 }, { y: walk + 1, alt: 0.3125 }, { y: "end", alt: 0.92 }]} />
       <Promenade members={members} ghosts={ghosts} live={live} liveEnabled={liveEnabled}>
         <div className="hero">
-          <p className="sticker sticker-blue -rotate-2">{crew.name}</p>
+          <GroupSticker name={crew.name} groups={groups.map((g) => ({ id: g.crew.id, name: g.crew.name, current: g.crew.id === crew.id }))} />
           <h1 className="hero-line">
             Which songs are
             <br />
@@ -331,7 +334,14 @@ async function SignedOut() {
   const db = await getDb();
   const crew = (await db.select().from(schema.crews).limit(1))[0];
   const admin = crew
-    ? (await db.select().from(schema.users).where(eq(schema.users.crewId, crew.id))).find((u) => u.isAdmin)
+    ? (
+        await db
+          .select({ name: schema.users.name })
+          .from(schema.memberships)
+          .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
+          .where(and(eq(schema.memberships.crewId, crew.id), eq(schema.memberships.role, "admin")))
+          .limit(1)
+      )[0]
     : null;
   return (
     <div className="mx-auto max-w-xl py-12">

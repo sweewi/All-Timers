@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { ListKind, Track, User } from "@/db/schema";
 import { artistLine } from "./songs";
+import { inGroup } from "./groups";
 
 /**
  * The social layer reads every list in the group at once: who shares which songs,
@@ -25,7 +26,7 @@ async function groupRows(crewId: string): Promise<Row[]> {
     .from(schema.listEntries)
     .innerJoin(schema.users, eq(schema.users.id, schema.listEntries.userId))
     .innerJoin(schema.tracks, eq(schema.tracks.id, schema.listEntries.trackId))
-    .where(eq(schema.users.crewId, crewId));
+    .where(inGroup(crewId));
 }
 
 const keyOf = (t: Track) => t.songKey || t.id;

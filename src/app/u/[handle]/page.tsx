@@ -17,6 +17,7 @@ import { getCrewOverview } from "@/lib/lists";
 import { Altitude } from "@/components/World";
 import { getReactions, songTarget } from "@/lib/reactions";
 import { getPlays, refreshListening } from "@/lib/listening";
+import { shareAGroup } from "@/lib/groups";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -41,7 +42,8 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
   const kind = sp.list === "on_deck" ? "on_deck" : "all_time";
   const db = await getDb();
   const person = (await db.select().from(schema.users).where(eq(schema.users.handle, handle)))[0];
-  if (!person || person.crewId !== viewer.crewId) notFound();
+  // anyone you share a group with can climb your column
+  if (!person || !(await shareAGroup(viewer.id, person.id))) notFound();
   const isMe = person.id === viewer.id;
 
   const [allTime, onDeck] = await Promise.all([getList(person.id, "all_time"), getList(person.id, "on_deck")]);

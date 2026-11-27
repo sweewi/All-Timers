@@ -6,6 +6,9 @@ import { signOut } from "@/app/actions";
 import { ShareInvite } from "@/components/ShareInvite";
 import { LinkMaker } from "./LinkMaker";
 import { MemberRow } from "./MemberRow";
+import { GroupList } from "./GroupList";
+import { createGroup } from "@/app/actions";
+import { isSiteAdmin, myGroups } from "@/lib/groups";
 import { RenameGroup } from "./RenameGroup";
 import { makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
 import { ActionButton } from "./ActionButton";
@@ -23,9 +26,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const counts = new Map(
     user.isAdmin ? (await getCrewOverview(user.crewId)).map((o) => [o.member.id, o.count] as const) : [],
   );
+  const [groups, siteAdmin] = await Promise.all([myGroups(user.id), isSiteAdmin(user.id)]);
   const spotifyConnected =
-    user.isAdmin &&
-    (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token"))).length > 0;
+    user.isAdmin && (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token"))).length > 0;
   const acct = await getAccount(user.id);
   let statsfm: StatsfmView | null = null;
   if (acct) {
@@ -73,7 +76,29 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <StatsfmPanel key={acct?.statsfmId ?? "none"} account={statsfm} />
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3" id="groups">
+        <h2 className="font-medium">Your groups</h2>
+        <p className="text-sm text-muted">
+          Your All-Timers list is the same in every group; each group has its own plaza, feed and monthly list.
+        </p>
+        <GroupList groups={groups.map((g) => ({ id: g.crew.id, name: g.crew.name, admin: g.role === "admin", current: g.crew.id === user.crewId }))} />
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted hover:text-foreground">Start a new group</summary>
+          <form action={createGroup} className="mt-2 flex flex-wrap gap-2">
+            <input
+              name="groupName"
+              required
+              maxLength={60}
+              placeholder="e.g. Roommates' All-Timers"
+              className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 outline-none focus:border-accent"
+            />
+            <button className="rounded-full border border-line px-4 py-2 hover:border-accent">Create</button>
+          </form>
+          <p className="mt-1 text-xs text-muted">You&apos;ll be its admin, then invite people with its own link.</p>
+        </details>
+      </section>
+
+      <section className="space-y-3" id="invite">
         <h2 className="font-medium">Invite new people to {crew.name}</h2>
         <p className="text-sm text-muted">For friends joining for the first time: they pick their name and get their own column.</p>
         <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
@@ -89,8 +114,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <section className="space-y-3" id="members">
             <h2 className="font-medium">Members</h2>
             <p className="text-sm text-muted">
-              Admins can make sign-in links for anyone who lost access, make other admins, remove members, and run the Spotify hub.
-              Anyone in the group can already invite people with the invite link above; admin isn&apos;t needed for that.
+              Admins of {crew.name} can make sign-in links for anyone who lost access, make other admins, and remove people from this
+              group. Anyone in the group can already invite people with the invite link above; admin isn&apos;t needed for that.
             </p>
             <ul className="divide-y divide-line rounded-2xl border border-line">
               {members.map((m) => (
@@ -104,7 +129,16 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
           <section className="space-y-3">
             <h2 className="font-medium">Spotify</h2>
-            {!hasSpotifyApp ? (
+            {!siteAdmin ? (
+              spotifyConnected ? (
+                <div className="flex items-center gap-3">
+                  <ActionButton run={syncSpotifyMirrors} label="Sync this group's playlist now" />
+                  <span className="text-xs text-muted">The site&apos;s hub account keeps each group&apos;s monthly playlist.</span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted">The site&apos;s owner hasn&apos;t connected the Spotify hub yet.</p>
+              )
+            ) : !hasSpotifyApp ? (
               <p className="text-sm text-muted">
                 Not set up. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to the environment (see README) so imports
                 get artist, album, year and version data.

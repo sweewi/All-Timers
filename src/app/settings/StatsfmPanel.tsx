@@ -205,12 +205,20 @@ function RefreshButton() {
 /** What stats.fm actually has for this person, and what to do about gaps. */
 function Health({ a }: { a: StatsfmView }) {
   const notes: React.ReactNode[] = [];
-  if (a.syncing === false) {
+  if (a.syncing === false && !a.isPlus) {
     notes.push(
       <>
-        <b>stats.fm isn&apos;t syncing your Spotify right now</b>, so it only catches some of what you play
-        {a.recentStreams != null && ` (it saw ${a.recentStreams} plays in the last 4 weeks)`}. Turn it on in the stats.fm app:{" "}
-        <b>Settings → Connections → Sync streams</b>.
+        <b>Free stats.fm records a sample of your listening, not every play</b>
+        {a.recentStreams != null && ` (${a.recentStreams} plays in the last 4 weeks)`}. Full play-by-play sync comes with stats.fm Plus, so
+        counts here undercount what you really play.
+      </>,
+    );
+  } else if (a.syncing === false) {
+    notes.push(
+      <>
+        stats.fm&apos;s full sync looks off for you, so it may miss plays
+        {a.recentStreams != null && ` (${a.recentStreams} plays in the last 4 weeks)`}. With Plus you can turn it on in the stats.fm app:
+        Settings → Connections → Sync streams.
       </>,
     );
   }
@@ -225,8 +233,8 @@ function Health({ a }: { a: StatsfmView }) {
   if (!a.isPlus) {
     notes.push(
       <>
-        Free stats.fm gives rankings but hides play counts for 4-week, 6-month and lifetime lists, so your column shows ranks (&ldquo;#12
-        most played&rdquo;) instead of counts.{a.imported === false && " Importing your full Spotify history (for accurate lifetime numbers) needs stats.fm Plus."}
+        Free stats.fm also hides play counts for 4-week, 6-month and lifetime lists, so your column shows ranks (&ldquo;#12 most
+        played&rdquo;) instead of counts.{a.imported === false && " Importing your full Spotify history (for accurate lifetime numbers) needs Plus too."}
       </>,
     );
   }

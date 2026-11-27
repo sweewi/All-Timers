@@ -1,7 +1,8 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
+import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { hashToken, newToken } from "./ids";
 
@@ -33,18 +34,33 @@ export async function endSession() {
   jar.delete(COOKIE);
 }
 
-export async function getCurrentUser() {
+/**
+ * The signed-in person, as seen in the group they're currently looking at:
+ * `crewId` is that group and `isAdmin` is their role there. If they've left (or been
+ * removed from) that group, they land in another of theirs; with no groups left,
+ * they're signed out.
+ */
+export const getCurrentUser = cache(async () => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const db = await getDb();
   const rows = await db
-    .select({ user: schema.users })
+    .select({ user: schema.users, role: schema.memberships.role })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
+    .leftJoin(schema.memberships, and(eq(schema.memberships.userId, schema.users.id), eq(schema.memberships.crewId, schema.users.crewId)))
     .where(eq(schema.sessions.tokenHash, hashToken(token)))
     .limit(1);
-  return rows[0]?.user ?? null;
-}
+  const row = rows[0];
+  if (!row) return null;
+  if (row.role) return { ...row.user, isAdmin: row.role === "admin" };
+  const other = (
+    await db.select().from(schema.memberships).where(eq(schema.memberships.userId, row.user.id)).orderBy(asc(schema.memberships.joinedAt)).limit(1)
+  )[0];
+  if (!other) return null;
+  await db.update(schema.users).set({ crewId: other.crewId }).where(eq(schema.users.id, row.user.id));
+  return { ...row.user, crewId: other.crewId, isAdmin: other.role === "admin" };
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();

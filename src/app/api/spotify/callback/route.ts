@@ -2,13 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isSiteAdmin } from "@/lib/groups";
 import { safeFetchJson } from "@/lib/net";
 import { z } from "zod";
 
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   const back = (status: string) => NextResponse.redirect(new URL(`/settings?spotify=${status}`, request.url));
-  if (!user?.isAdmin) return back("error");
+  if (!user || !(await isSiteAdmin(user.id))) return back("error");
 
   const params = request.nextUrl.searchParams;
   const jar = await cookies();

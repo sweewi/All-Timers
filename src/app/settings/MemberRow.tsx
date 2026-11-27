@@ -57,8 +57,9 @@ export function MemberRow({ m }: { m: MemberView }) {
           }}
         >
           <p className="text-red-800">
-            This deletes {m.name}&apos;s lists, stories, reactions, listening data and votes, and signs them out everywhere. It can&apos;t
-            be undone. Songs they put you on to stay on your list, just without their name.
+            This removes {m.name} from this group and deletes their votes here. If it&apos;s their only group, their account goes
+            too: lists, stories, reactions and listening data, signed out everywhere. It can&apos;t be undone. Songs they put you on to
+            stay on your list.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <input

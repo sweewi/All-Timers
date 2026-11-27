@@ -16,6 +16,7 @@ import {
   type TopTrack,
 } from "./statsfm";
 import { NetError } from "./net";
+import { inGroup } from "./groups";
 
 /**
  * Listening data from stats.fm, cached in our database.
@@ -350,7 +351,7 @@ export async function refreshCrew(crewId: string, opts: { only?: ("profile" | Pe
     .select({ userId: schema.statsfmAccounts.userId })
     .from(schema.statsfmAccounts)
     .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(eq(schema.users.crewId, crewId));
+    .where(inGroup(crewId));
   for (const m of members) await refreshListening(m.userId, opts);
   return members.length;
 }
@@ -448,7 +449,7 @@ export async function getLive(crewId: string, budget = 4): Promise<Live[]> {
     .select({ a: schema.statsfmAccounts })
     .from(schema.statsfmAccounts)
     .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(eq(schema.users.crewId, crewId));
+    .where(inGroup(crewId));
   const visible = accts.map((r) => r.a).filter((a) => visibility(a).live);
   if (!visible.length) return [];
   const cached = await db.select().from(schema.nowPlaying).where(inArray(schema.nowPlaying.userId, visible.map((a) => a.userId)));
@@ -484,7 +485,7 @@ export async function staleMembers(crewId: string, limit = 2) {
     .select({ userId: schema.statsfmAccounts.userId, checkedAt: schema.statsfmAccounts.checkedAt })
     .from(schema.statsfmAccounts)
     .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(and(eq(schema.users.crewId, crewId), eq(schema.statsfmAccounts.status, "ok")));
+    .where(and(inGroup(crewId), eq(schema.statsfmAccounts.status, "ok")));
   const syncs = rows.length
     ? await db
         .select()
@@ -558,7 +559,7 @@ export async function heavyRotation(crewId: string, perPerson = 3) {
     .select({ a: schema.statsfmAccounts, user: schema.users })
     .from(schema.statsfmAccounts)
     .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(eq(schema.users.crewId, crewId));
+    .where(inGroup(crewId));
   const out: { user: (typeof rows)[number]["user"]; track: Track; streams: number | null; position: number }[] = [];
   for (const { a, user } of rows) {
     if (!visibility(a).plays || !hasRepeats(a)) continue;

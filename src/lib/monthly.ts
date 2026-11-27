@@ -5,6 +5,7 @@ import type { MonthlyRound, Track } from "@/db/schema";
 import { newId } from "./ids";
 import { fetchMonth, getAccounts, monthKeyOf, monthWindow, visibility } from "./listening";
 import { buildPool, revealAt, tally, type MonthPick } from "./monthly-math";
+import { inGroup } from "./groups";
 
 export const NOMINATIONS_PER_PERSON = 3;
 export const PICKS_PER_PERSON = 5;
@@ -53,7 +54,7 @@ export async function pastRounds(crewId: string) {
 export async function refreshPool(round: MonthlyRound) {
   if (round.status !== "open") return;
   const db = await getDb();
-  const members = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.crewId, round.crewId));
+  const members = await db.select({ id: schema.users.id }).from(schema.users).where(inGroup(round.crewId));
   const accts = await getAccounts(members.map((m) => m.id));
   const perUser = new Map<string, MonthPick[]>();
   for (const [userId, a] of accts) {

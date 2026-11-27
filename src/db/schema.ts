@@ -23,12 +23,14 @@ export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
+    /** the group this person is looking at right now; which groups they belong to is in memberships */
     crewId: text("crew_id")
       .notNull()
       .references(() => crews.id),
     name: text("name").notNull(),
     handle: text("handle").notNull().unique(),
     color: text("color").notNull(),
+    /** @deprecated admin is per group now: memberships.role. Kept only so old rows stay readable. */
     isAdmin: boolean("is_admin").notNull().default(false),
     /** when they finished or closed the first-run guide; null = show it on next visit */
     guideSeenAt: timestamp("guide_seen_at", { withTimezone: true }),
@@ -38,6 +40,29 @@ export const users = pgTable(
 );
 
 /** One row per signed-in browser. The cookie holds the raw token; we store its hash. */
+export const MEMBER_ROLES = ["member", "admin"] as const;
+export type MemberRole = (typeof MEMBER_ROLES)[number];
+
+/**
+ * Who belongs to which group. A person has one All-Timers list wherever they go;
+ * groups are the audiences for it (plaza, feed, monthly list, admins).
+ */
+export const memberships = pgTable(
+  "memberships",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    crewId: text("crew_id")
+      .notNull()
+      .references(() => crews.id, { onDelete: "cascade" }),
+    role: text("role", { enum: MEMBER_ROLES }).notNull().default("member"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.crewId] }), index("memberships_crew_idx").on(t.crewId)],
+);
+export type Membership = typeof memberships.$inferSelect;
+
 export const sessions = pgTable("sessions", {
   tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id")

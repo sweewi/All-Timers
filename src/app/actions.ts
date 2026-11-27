@@ -4,11 +4,12 @@ import { redirect } from "next/navigation";
 import { and, eq, like } from "drizzle-orm";
 import { refresh } from "next/cache";
 import { getDb, schema } from "@/db";
-import { startSession, endSession, requireUser } from "@/lib/auth";
+import { startSession, endSession, getCurrentUser, requireUser } from "@/lib/auth";
 import { getList, saveList } from "@/lib/lists";
 import { newId, newToken, pickColor, slugify } from "@/lib/ids";
 import { REACTIONS, type ReactionKind } from "@/db/schema";
 import { budget, clientAddress, parse, zId, zTrackId } from "@/lib/guard";
+import { addMembership, getMembership, inGroup, shareAGroup } from "@/lib/groups";
 
 async function uniqueHandle(name: string) {
   const db = await getDb();
@@ -42,8 +43,35 @@ export async function setupCrew(formData: FormData) {
     color: pickColor(0),
     isAdmin: true,
   });
+  await addMembership(userId, crewId, "admin");
   await startSession(userId);
   redirect("/me/import?first=1");
+}
+
+/** A signed-in member starts another group (they're its admin) and switches to it. */
+export async function createGroup(formData: FormData) {
+  const user = await requireUser();
+  await budget("join", user.id);
+  const name = String(formData.get("groupName") || "").trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!name) redirect("/settings?group=name#groups");
+  const db = await getDb();
+  const crewId = newId();
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.crews).values({ id: crewId, name, inviteCode: newToken(9) });
+    await tx.insert(schema.memberships).values({ userId: user.id, crewId, role: "admin" });
+    await tx.update(schema.users).set({ crewId }).where(eq(schema.users.id, user.id));
+  });
+  redirect("/settings#invite");
+}
+
+/** Look at another of your groups. Your list is the same everywhere; the plaza, feed and monthly list change. */
+export async function switchGroup(crewIdIn: string) {
+  const user = await requireUser();
+  const crewId = parse(zId, crewIdIn);
+  if (!(await getMembership(user.id, crewId))) throw new Error("Not a member");
+  const db = await getDb();
+  await db.update(schema.users).set({ crewId }).where(eq(schema.users.id, user.id));
+  refresh();
 }
 
 /**
@@ -59,8 +87,18 @@ export async function joinCrew(formData: FormData) {
   const fromOrigin = zId.safeParse(fromOriginRaw).success ? fromOriginRaw : "";
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.inviteCode, code)))[0];
   if (!crew) redirect("/");
+
+  // already signed in: same person, one more group (your list comes with you)
+  const me = await getCurrentUser();
+  if (me) {
+    await addMembership(me.id, crew.id, "member");
+    await db.update(schema.users).set({ crewId: crew.id }).where(eq(schema.users.id, me.id));
+    if (fromOrigin) await creditOrigin(fromOrigin, me.id, crew.id);
+    redirect("/");
+  }
+
   if (!name) redirect(`/join/${code}?error=name`);
-  const count = (await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.crewId, crew.id)))
+  const count = (await db.select({ id: schema.users.id }).from(schema.users).where(inGroup(crew.id)))
     .length;
   const userId = newId();
   await db.insert(schema.users).values({
@@ -70,20 +108,22 @@ export async function joinCrew(formData: FormData) {
     handle: await uniqueHandle(name),
     color: pickColor(count),
   });
-  if (fromOrigin) {
-    const origin = (await db.select().from(schema.origins).where(eq(schema.origins.id, fromOrigin)))[0];
-    if (origin && !origin.fromUserId) {
-      const owner = (await db.select().from(schema.users).where(eq(schema.users.id, origin.userId)))[0];
-      if (owner?.crewId === crew.id) {
-        await db
-          .update(schema.origins)
-          .set({ fromUserId: userId, fromName: null, foundVia: "friend", updatedAt: new Date() })
-          .where(eq(schema.origins.id, origin.id));
-      }
-    }
-  }
+  await addMembership(userId, crew.id, "member");
+  if (fromOrigin) await creditOrigin(fromOrigin, userId, crew.id);
   await startSession(userId);
   redirect("/me/import?first=1");
+}
+
+/** "Jack put me on to this": the invited person gets the credit, if Jack is in that group. */
+async function creditOrigin(originId: string, newcomerId: string, crewId: string) {
+  const db = await getDb();
+  const origin = (await db.select().from(schema.origins).where(eq(schema.origins.id, originId)))[0];
+  if (!origin || origin.fromUserId || origin.userId === newcomerId) return;
+  if (!(await getMembership(origin.userId, crewId))) return;
+  await db
+    .update(schema.origins)
+    .set({ fromUserId: newcomerId, fromName: null, foundVia: "friend", updatedAt: new Date() })
+    .where(eq(schema.origins.id, origin.id));
 }
 
 export async function signOut() {
@@ -102,7 +142,7 @@ export async function stealSong(trackIdIn: string, fromUserIdIn: string) {
   await budget("write", user.id);
   const db = await getDb();
   const giver = (await db.select().from(schema.users).where(eq(schema.users.id, fromUserId)))[0];
-  if (!giver || giver.crewId !== user.crewId || giver.id === user.id) return { ok: false as const };
+  if (!giver || giver.id === user.id || !(await shareAGroup(user.id, giver.id))) return { ok: false as const };
   const [allTime, onDeck] = await Promise.all([getList(user.id, "all_time"), getList(user.id, "on_deck")]);
   if ([...allTime, ...onDeck].some((e) => e.track.id === trackId)) return { ok: true as const, already: true };
   await saveList(user.id, "on_deck", [...onDeck.map((e) => e.track.id), trackId]);

@@ -4,17 +4,34 @@ import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { joinCrew } from "@/app/actions";
 import { Altitude } from "@/components/World";
+import { getMembership, inGroup } from "@/lib/groups";
 
-export default async function JoinPage({ params, searchParams }: PageProps<"/join/[code]">) {
+export default async function JoinPage({
+  params,
+  searchParams,
+}: PageProps<"/join/[code]">) {
   const { code } = await params;
   const sp = await searchParams;
   const fromOrigin = typeof sp.from === "string" ? sp.from : "";
   const db = await getDb();
-  const crew = (await db.select().from(schema.crews).where(eq(schema.crews.inviteCode, code)))[0];
+  const crew = (
+    await db
+      .select()
+      .from(schema.crews)
+      .where(eq(schema.crews.inviteCode, code))
+  )[0];
   if (!crew) notFound();
   const user = await getCurrentUser();
-  if (user) redirect("/");
-  const members = await db.select().from(schema.users).where(eq(schema.users.crewId, crew.id));
+  // already in this group: just go look at it
+  if (user && (await getMembership(user.id, crew.id))) {
+    if (user.crewId !== crew.id)
+      await db
+        .update(schema.users)
+        .set({ crewId: crew.id })
+        .where(eq(schema.users.id, user.id));
+    redirect("/");
+  }
+  const members = await db.select().from(schema.users).where(inGroup(crew.id));
 
   // If they were invited from someone's origin story, show the song that brought them here.
   let invitedBy: { name: string; track: string } | null = null;
@@ -33,13 +50,21 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
   return (
     <div className="join-page mx-auto max-w-md py-2">
       <Altitude base={0} range={0.06} />
-      <p className="text-sm uppercase tracking-widest text-muted">You&apos;re invited to</p>
+      <p className="text-sm uppercase tracking-widest text-muted">
+        You&apos;re invited to
+      </p>
       <h1 className="rank-num mt-1 text-5xl">{crew.name}</h1>
       {members.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
           {members.map((m) => (
-            <span key={m.id} className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1">
-              <span className="h-2 w-2 rounded-full" style={{ background: m.color }} />
+            <span
+              key={m.id}
+              className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1"
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: m.color }}
+              />
               {m.name}
             </span>
           ))}
@@ -48,24 +73,44 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
       )}
       {invitedBy && (
         <p className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm">
-          <b>{invitedBy.name}</b> says you put them on to <b>{invitedBy.track}</b>. Join and you&apos;ll get the credit.
+          <b>{invitedBy.name}</b> says you put them on to{" "}
+          <b>{invitedBy.track}</b>. Join and you&apos;ll get the credit.
         </p>
       )}
-      <form action={joinCrew} className="mt-8 space-y-4">
-        <input type="hidden" name="code" value={code} />
-        <input type="hidden" name="fromOrigin" value={fromOrigin} />
-        <label className="block">
-          <span className="text-sm">What should everyone call you?</span>
-          <input
-            name="name"
-            required
-            autoFocus
-            className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2"
-          />
-        </label>
-        <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">Join</button>
-        <p className="text-xs text-muted">No password. This device stays signed in; you can add other devices from Settings.</p>
-      </form>
+      {user ? (
+        <form action={joinCrew} className="mt-8 space-y-3">
+          <input type="hidden" name="code" value={code} />
+          <input type="hidden" name="fromOrigin" value={fromOrigin} />
+          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">
+            Join as {user.name}
+          </button>
+          <p className="text-xs text-muted">
+            Your All-Timers list comes with you: same column, now in {crew.name}{" "}
+            too. Switch between your groups any time in Settings.
+          </p>
+        </form>
+      ) : (
+        <form action={joinCrew} className="mt-8 space-y-4">
+          <input type="hidden" name="code" value={code} />
+          <input type="hidden" name="fromOrigin" value={fromOrigin} />
+          <label className="block">
+            <span className="text-sm">What should everyone call you?</span>
+            <input
+              name="name"
+              required
+              autoFocus
+              className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2"
+            />
+          </label>
+          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">
+            Join
+          </button>
+          <p className="text-xs text-muted">
+            No password. This device stays signed in; you can add other devices
+            from Settings.
+          </p>
+        </form>
+      )}
     </div>
   );
 }

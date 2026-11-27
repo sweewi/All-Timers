@@ -61,9 +61,13 @@ Members can link their [stats.fm](https://stats.fm) profile in Settings (usernam
 
 Being a good guest to an unofficial API: requests are throttled (2 at a time), cached (4 h to 24 h depending on the data), refreshed after pages render rather than during, backed off on 429, and the site works without it.
 
+## Groups
+
+One person, one All-Timers list; groups are audiences for it. `memberships` (user, group, role) says who belongs where and who's admin of which group; `users.crew_id` is just the group someone is looking at right now. Opening another group's invite while signed in joins it as yourself. Settings → Your groups switches between them or starts a new one (you're its admin); with more than one group, the group name on the plaza is also a switcher. Each group has its own plaza, feed, monthly list and admins. Columns are visible to anyone you share a group with. The Spotify hub is site-wide and run by the admins of the site's first group.
+
 ## Admin, guide
 
-- **Admins** (Settings → Members): make sign-in links for anyone who lost access, make or remove admins (there's always at least one), and remove a member with all their data (typed confirmation). Anyone can invite people with the invite link.
+- **Admins** (Settings → Members, per group): make sign-in links for anyone who lost access, make or remove admins (there's always at least one), rename the group, and remove someone from the group (typed confirmation). If it was their only group, their account and data go too. Anyone can invite people with the invite link.
 - **The guide**: opens by itself on someone's first visit (setup checklist with live status, then a tour with examples), resumes after they import their list, and reopens any time from the **?** in the header. Seen-state is stored per member (`users.guide_seen_at`).
 
 ## Safety
