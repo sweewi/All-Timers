@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
     ];
   },
   serverExternalPackages: ["@electric-sql/pglite"],
+  // preview sandboxes migrate an in-memory database at runtime, so ship the SQL and the engine's wasm
+  outputFileTracingIncludes: {
+    "/**": ["./drizzle/**/*", "./node_modules/@electric-sql/pglite/dist/*.wasm", "./node_modules/@electric-sql/pglite/dist/*.data"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "i.scdn.co" },

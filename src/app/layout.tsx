@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 import { World } from "@/components/World";
 import { Footpath } from "@/components/Footpath";
+import { SandboxBar } from "@/components/SandboxBar";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const roman = localFont({
@@ -60,6 +61,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${roman.variable} ${garamond.variable} ${body.variable} ${tall.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <World />
+        <SandboxBar current={user?.handle} />
         <header data-site-header className="border-b border-line">
           <nav className="mx-auto flex max-w-5xl items-center gap-5 px-5 py-4 text-sm">
             <Link href="/" className="brand">
