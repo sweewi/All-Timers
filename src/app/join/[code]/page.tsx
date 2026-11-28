@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -5,6 +6,17 @@ import { getCurrentUser } from "@/lib/auth";
 import { joinCrew } from "@/app/actions";
 import { Altitude } from "@/components/World";
 import { getMembership, inGroup } from "@/lib/groups";
+
+export async function generateMetadata({ params }: PageProps<"/join/[code]">): Promise<Metadata> {
+  const { code } = await params;
+  const db = await getDb();
+  const crew = (await db.select({ name: schema.crews.name }).from(schema.crews).where(eq(schema.crews.inviteCode, code)))[0];
+  if (!crew) return { title: "All-Timers", robots: { index: false } };
+  const title = `Join ${crew.name} on All-Timers`;
+  const description = "Put your all-time favorite songs, in order, next to your friends'.";
+  const image = { url: `/join/${code}/card`, width: 1200, height: 630, alt: title };
+  return { title, description, robots: { index: false }, openGraph: { title, description, images: [image] }, twitter: { card: "summary_large_image", images: [image.url] } };
+}
 
 export default async function JoinPage({
   params,

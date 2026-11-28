@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCrewOverview } from "@/lib/lists";
@@ -290,50 +290,43 @@ function timeAgo(d: Date) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+/**
+ * The front door for someone not signed in. It says nothing about who's inside: groups
+ * are private, so the way in is an invite link or starting a list of your own.
+ */
 async function SignedOut() {
   const db = await getDb();
-  const crew = (await db.select().from(schema.crews).limit(1))[0];
-  const admin = crew
-    ? (
-        await db
-          .select({ name: schema.users.name })
-          .from(schema.memberships)
-          .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
-          .where(and(eq(schema.memberships.crewId, crew.id), eq(schema.memberships.role, "admin")))
-          .limit(1)
-      )[0]
-    : null;
+  const empty = (await db.select({ id: schema.crews.id }).from(schema.crews).limit(1)).length === 0;
   return (
     <div className="mx-auto max-w-xl py-12">
       <Altitude base={0.3} range={0.1} />
-      <h1 className="tall-h text-[clamp(56px,12vw,120px)]">Everyone&apos;s all-time songs, standing tall.</h1>
-      {crew ? (
-        <p className="paper-note mt-6">
-          This is {crew.name}. To join, ask {admin?.name ?? "whoever runs it"} for the invite link. Already in on another
-          device? Open Settings there and tap &ldquo;Make a link for my other device.&rdquo;
-        </p>
-      ) : (
-        <form action={setupCrew} className="mt-8 space-y-4 rounded-2xl border border-line bg-surface p-6">
-          <div>
-            <h2 className="font-medium">Start your group</h2>
-            <p className="mt-1 text-sm text-muted">
-              You only do this once. You&apos;ll get one invite link; everyone you send it to joins this same group.
-            </p>
-          </div>
-          <label className="block">
-            <span className="text-sm">Your name</span>
-            <input name="name" required className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2" />
+      <h1 className="tall-h text-[clamp(56px,12vw,120px)]">Which songs are your All-Timers?</h1>
+      <p className="tall-sub mt-4">The handful of songs that get you the most, in order, with why each one made it. Set in stone, next to your friends&apos;.</p>
+      {empty ? (
+        <form action={setupCrew} className="note note-blue mt-8 grid gap-4">
+          <b>Start the first group</b>
+          <label className="grid gap-1">
+            <span className="text-sm">My name</span>
+            <input name="name" required maxLength={40} className="field" />
           </label>
-          <label className="block">
+          <label className="grid gap-1">
             <span className="text-sm">Group name (optional)</span>
-            <input
-              name="crewName"
-              placeholder="e.g. The Boys, Saturday Club"
-              className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2"
-            />
+            <input name="crewName" maxLength={60} placeholder="e.g. The Boys, Saturday Club" className="field" />
           </label>
-          <button className="btn btn-gold">Start</button>
+          <button className="btn btn-gold justify-self-start">Start</button>
         </form>
+      ) : (
+        <div className="note note-blue mt-8 grid gap-3">
+          <p>
+            <b>Got an invite link?</b> Open it and you&apos;re in. Already signed in on another device? Open Settings there and make a link
+            for this one.
+          </p>
+          <p>
+            <Link href="/start" className="btn btn-gold">
+              Make my All-Timers
+            </Link>
+          </p>
+        </div>
       )}
     </div>
   );
