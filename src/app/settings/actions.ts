@@ -9,8 +9,6 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { budget, parse, zId } from "@/lib/guard";
 import { RateLimited } from "@/lib/ratelimit";
-import { mirrorCrew, syncMonth } from "@/lib/mirror";
-import { rebuildCurrentPool } from "@/lib/monthly";
 import { adminCount, getMembership, isSiteAdmin, myGroups } from "@/lib/groups";
 import { connectStatsfm, disconnectStatsfm, refreshListening, setSwitches } from "@/lib/listening";
 
@@ -60,11 +58,7 @@ export async function connectStatsfmAction(input: string): Promise<StatsfmAction
   }
   const r = await connectStatsfm(user.id, text);
   if (!r.ok) return { ok: false, message: r.message };
-  after(async () => {
-    await refreshListening(user.id, { force: true });
-    const round = await rebuildCurrentPool(user.crewId);
-    await syncMonth(round.id);
-  });
+  after(() => refreshListening(user.id, { force: true }));
   refresh();
   return { ok: true };
 }
@@ -72,16 +66,12 @@ export async function connectStatsfmAction(input: string): Promise<StatsfmAction
 export async function disconnectStatsfmAction() {
   const user = await requireUser();
   await disconnectStatsfm(user.id);
-  after(async () => {
-    const round = await rebuildCurrentPool(user.crewId);
-    await syncMonth(round.id);
-  });
   refresh();
 }
 
-export async function setStatsfmSwitch(which: "showLive" | "showPlays", on: boolean) {
+export async function setStatsfmSwitch(which: "showPlays", on: boolean) {
   const user = await requireUser();
-  const key = parse(z.enum(["showLive", "showPlays"]), which);
+  const key = parse(z.enum(["showPlays"]), which);
   const val = parse(z.boolean(), on);
   await budget("write", user.id);
   await setSwitches(user.id, { [key]: val });
@@ -98,23 +88,8 @@ export async function refreshStatsfmNow(): Promise<string> {
     throw e;
   }
   const r = await refreshListening(user.id, { force: true });
-  const round = await rebuildCurrentPool(user.crewId);
-  after(() => syncMonth(round.id));
   refresh();
   return r.refreshed.length ? "Up to date" : "stats.fm didn't answer. We'll try again later.";
-}
-
-/** Admin only: push this group's monthly playlists to the Spotify hub now. */
-export async function syncSpotifyMirrors(): Promise<string> {
-  const admin = await requireUser();
-  if (!admin.isAdmin) throw new Error("Not allowed");
-  await budget("link", admin.id);
-  // bring this month's pool up to date first, so the playlist matches what people played
-  await rebuildCurrentPool(admin.crewId);
-  const r = await mirrorCrew(admin.crewId);
-  if (r.skipped) return "Connect the hub account first.";
-  if (r.failed) return `${r.synced} synced. ${r.errors.join(" ")}`;
-  return r.synced ? `${r.synced} playlist${r.synced === 1 ? "" : "s"} synced` : "Nothing to sync yet: the pool is empty.";
 }
 
 // ---------------------------------------------------------------------------- members (admin)
@@ -146,8 +121,8 @@ export async function setAdmin(memberId: string, makeAdmin: boolean): Promise<{ 
 }
 
 /**
- * Remove someone from this group: they stop seeing it and it stops seeing them, and
- * their votes in its monthly lists go. If this was their only group, their account
+ * Remove someone from this group: they stop seeing it and it stops seeing them (and any
+ * old monthly ballots they left in it go). If this was their only group, their account
  * and everything they made goes too (lists, stories, moves, reactions, listening
  * data, sessions); credits they gave others become anonymous. Typed-name confirmation.
  */
@@ -182,10 +157,6 @@ export async function removeMember(memberId: string, typedName: string): Promise
     // everything else is tied to the person and goes with them
     await tx.delete(schema.users).where(eq(schema.users.id, member.id));
   });
-  after(async () => {
-    const round = await rebuildCurrentPool(admin.crewId);
-    await syncMonth(round.id);
-  });
   refresh();
   return {
     ok: true,
@@ -193,7 +164,7 @@ export async function removeMember(memberId: string, typedName: string): Promise
   };
 }
 
-/** Admin only: rename the group (shown on the plaza, invites, and the monthly playlist). */
+/** Admin only: rename the group (shown on the plaza and on invites). */
 export async function renameGroup(nameIn: string): Promise<{ ok: boolean; message: string }> {
   const admin = await requireUser();
   if (!admin.isAdmin) throw new Error("Not allowed");

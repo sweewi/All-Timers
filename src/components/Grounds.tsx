@@ -14,6 +14,8 @@ export type GroundMember = {
   count: number;
   cover: string | null;
   isMe: boolean;
+  /** their list is set in stone */
+  setInStone?: boolean;
 };
 
 /** Where each column stands: x across the plain (%), how near it is (1 = front row). */
@@ -97,12 +99,12 @@ export function Grounds({
               <span className="mini-label" style={{ top: `${((mini.ground / mini.h) * 100).toFixed(2)}%` }}>
                 {m ? (
                   <>
-                    <b style={{ ["--c" as string]: m.color }}>{m.isMe ? "You" : m.name}</b>
+                    <b style={{ ["--c" as string]: m.color }}>{m.name}</b>
                     <small>{m.count ? `${m.count} songs` : "no list yet"}</small>
                   </>
                 ) : (
                   <>
-                    <b>Your friend</b>
+                    <b>A friend</b>
                     <small>invite them</small>
                   </>
                 )}

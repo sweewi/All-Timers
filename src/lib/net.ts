@@ -74,9 +74,13 @@ function parseRetryAfter(v: string | null): number | null {
 }
 
 async function readCapped(res: Response, maxBytes: number) {
+  return new TextDecoder().decode(await readCappedBytes(res, maxBytes));
+}
+
+async function readCappedBytes(res: Response, maxBytes: number) {
   const len = Number(res.headers.get("content-length") ?? 0);
   if (len > maxBytes) throw new NetError("response too large", res.status, new URL(res.url).host);
-  if (!res.body) return "";
+  if (!res.body) return Buffer.alloc(0);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -90,7 +94,37 @@ async function readCapped(res: Response, maxBytes: number) {
     }
     chunks.push(value);
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return Buffer.concat(chunks);
+}
+
+/** Album art comes only from Spotify's image hosts. */
+const IMAGE_HOSTS = new Set(["i.scdn.co", "image-cdn-ak.spotifycdn.com", "image-cdn-fa.spotifycdn.com", "mosaic.scdn.co"]);
+
+/**
+ * Fetch an album cover as a data URI for drawing into share cards. Image hosts only,
+ * JPEG or PNG only, no redirects, 1.5 MB cap, short timeout. Null on any failure:
+ * a card draws a blank tile rather than failing.
+ */
+export async function fetchImageDataUri(url: string | null | undefined, timeoutMs = 4000): Promise<string | null> {
+  if (!url) return null;
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || !IMAGE_HOSTS.has(u.host) || hostCoolingDown(u.host)) return null;
+  try {
+    const res = await fetch(u, { headers: { "User-Agent": USER_AGENT }, redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
+    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!res.ok || (type !== "image/jpeg" && type !== "image/png")) return null;
+    const bytes = await readCappedBytes(res, 1_500_000);
+    recordSuccess(u.host);
+    return `data:${type};base64,${bytes.toString("base64")}`;
+  } catch {
+    recordFailure(u.host, null);
+    return null;
+  }
 }
 
 export type FetchOpts = {

@@ -18,6 +18,8 @@ import { Altitude } from "@/components/World";
 import { getReactions, songTarget } from "@/lib/reactions";
 import { getPlays, refreshListening } from "@/lib/listening";
 import { shareAGroup } from "@/lib/groups";
+import { getProfile } from "@/lib/profile";
+import { StoneCeremony } from "@/components/StoneCeremony";
 
 function foundText(o: Entry["origin"]) {
   if (!o) return null;
@@ -51,11 +53,12 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
 
   // The monument is the default way to see an all-time list; ?view=list is the plain list.
   if (kind === "all_time" && sp.view !== "list" && allTime.length > 0) {
-    const [social, overview, reacts, plays] = await Promise.all([
+    const [social, overview, reacts, plays, profile] = await Promise.all([
       getSocial(viewer.crewId, viewer.id),
       getCrewOverview(viewer.crewId),
       getReactions(allTime.map((e) => songTarget(person.id, e.track.id)), viewer.id),
       getPlays(person.id, allTime.map((e) => e.track.id)),
+      getProfile(person.id),
     ]);
     // stale numbers are refreshed after the page is sent; the next visit sees them
     after(() => refreshListening(person.id));
@@ -66,7 +69,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
     const neighbors = [...order.slice(at + 1), ...order.slice(0, Math.max(0, at))]
       .filter((o) => o.member.id !== person.id)
       .map((o) => ({
-        name: o.member.id === viewer.id ? "You" : o.member.name,
+        name: o.member.name,
         handle: o.member.handle,
         color: o.member.color,
         count: o.count,
@@ -87,7 +90,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       memory: [e.origin?.story, e.origin?.whenText].filter(Boolean).join(" · ") || null,
       echoes: echoes(e.track)
         .filter((h) => h.user.id !== person.id)
-        .map((h) => ({ name: h.user.id === viewer.id ? "You" : h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
+        .map((h) => ({ name: h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
       from: e.origin?.fromUser ? { name: e.origin.fromUser.name, handle: e.origin.fromUser.handle, color: e.origin.fromUser.color } : null,
       steal: !isMe && !social.has(e.track),
       reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
@@ -104,7 +107,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
             topIsMost: !!mostPlayed && mostPlayed.rank === 1,
           }
         : null;
-    const btn = "sticker sticker-paper sticker-lg";
+    const btn = "btn btn-marble";
     return (
       <Monument
         person={{ id: person.id, name: person.name, handle: person.handle, color: person.color }}
@@ -112,9 +115,22 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         songs={songs}
         receipts={receipts}
         isMe={isMe}
+        stone={profile?.setAt?.toISOString() ?? null}
+        rules={profile?.rules ?? null}
         storyHref={`/me/stories?list=all_time`}
         toolbar={
           <>
+            {isMe && !profile?.setAt && allTime.length >= 3 && <StoneCeremony count={allTime.length} cover={allTime[0]?.track.imageUrl ?? null} />}
+            {profile?.playlistId && (
+              <a href={`https://open.spotify.com/playlist/${profile.playlistId}`} target="_blank" rel="noopener noreferrer" className="btn btn-marble">
+                Listen on Spotify
+              </a>
+            )}
+            {isMe && (
+              <Link href="/me/share" className={btn}>
+                My card
+              </Link>
+            )}
             <Link href={isMe ? "/me/edit" : `/u/${handle}?view=list`} className={btn}>
               {isMe ? "List & reorder" : "List view"}
             </Link>
@@ -123,10 +139,6 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
                 On Deck ({onDeck.length})
               </Link>
             )}
-            {isMe ? null : (
-              <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className={btn}>Compare with me</Link>
-            )}
-
           </>
         }
       />
@@ -157,20 +169,16 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         <div className="flex flex-wrap gap-2">
           {isMe ? (
             <>
-              <Link href={`/me/edit?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
+              <Link href={`/me/edit?list=${kind}`} className="btn btn-marble btn-sm">
                 Reorder
               </Link>
-              <Link href={`/me/import?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
+              <Link href={`/me/import?list=${kind}`} className="btn btn-marble btn-sm">
                 Import from Spotify
               </Link>
             </>
-          ) : (
-            <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className="rounded-full border border-line px-4 py-2 text-sm">
-              Compare with me
-            </Link>
-          )}
+          ) : null}
           {allTime.length > 0 && (
-            <Link href={`/u/${handle}`} className="rounded-full border border-line px-4 py-2 text-sm">
+            <Link href={`/u/${handle}`} className="btn btn-marble btn-sm">
               Monument view
             </Link>
           )}

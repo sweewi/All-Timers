@@ -1,16 +1,15 @@
 import Link from "next/link";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCrewFeed, getCrewOverview, type FeedItem } from "@/lib/lists";
+import { getCrewOverview } from "@/lib/lists";
 import { Art } from "@/components/track";
-import { ShareInvite } from "@/components/ShareInvite";
+import { ShareSheet } from "@/components/ShareSheet";
 import { Altitude } from "@/components/World";
 import { type GroundMember } from "@/components/Grounds";
 import { Promenade } from "@/components/Promenade";
 import { promenadeScreens } from "@/lib/promenade";
 import { Doors } from "@/components/Portal";
-import { StealButton } from "@/components/StealButton";
 import { getSocial } from "@/lib/social";
 import { getReactions, movesTarget } from "@/lib/reactions";
 import { Reactions, type Counts } from "@/components/Reactions";
@@ -19,8 +18,9 @@ import { carvedTitle } from "@/lib/monument";
 import { setupCrew } from "./actions";
 import { after } from "next/server";
 import { backfillTracks } from "@/lib/spotify";
-import { getAccounts, getLiveNow, heavyRotation, refreshListening, visibility } from "@/lib/listening";
-import { compact } from "@/lib/time";
+import { getAccount, refreshListening } from "@/lib/listening";
+import { getNews, recentWhys, type NewsItem, type Why } from "@/lib/plaza";
+import { getProfiles } from "@/lib/profile";
 import { myGroups } from "@/lib/groups";
 import { GroupSticker } from "@/components/GroupSticker";
 
@@ -30,24 +30,22 @@ export default async function Home() {
 
   const db = await getDb();
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)))[0];
-  const [overview, feed, social] = await Promise.all([
+  const [overview, news, whys, social, groups, acct] = await Promise.all([
     getCrewOverview(user.crewId),
-    getCrewFeed(user.crewId, 12),
+    getNews(user.crewId, 10),
+    recentWhys(user.crewId, 12),
     getSocial(user.crewId, user.id),
+    myGroups(user.id),
+    getAccount(user.id),
+  ]);
+  const [profiles, reacts] = await Promise.all([
+    getProfiles(overview.map((o) => o.member.id)),
+    getReactions(news.filter((n) => n.type === "added").map((n) => movesTarget((n as Extract<NewsItem, { type: "added" }>).batchId)), user.id),
   ]);
   const mine = overview.find((o) => o.member.id === user.id);
-  const [reacts, live, rotation, accts, groups] = await Promise.all([
-    getReactions(feed.map((f) => movesTarget(f.batchId)), user.id),
-    getLiveNow(user.crewId, 0), // cache only during render; the browser asks for fresh data
-    heavyRotation(user.crewId),
-    getAccounts(overview.map((o) => o.member.id)),
-    myGroups(user.id),
-  ]);
-  const liveEnabled = [...accts.values()].some((a) => visibility(a).live);
-  const linked = accts.has(user.id);
   after(async () => {
     await backfillTracks();
-    if (linked) await refreshListening(user.id, { only: ["weeks", "months", "profile"] });
+    if (acct) await refreshListening(user.id, { only: ["weeks", "months", "profile"] });
   });
   const members: GroundMember[] = overview.map(({ member, count, top }) => ({
     name: member.name,
@@ -56,6 +54,7 @@ export default async function Home() {
     count,
     cover: top[0]?.imageUrl ?? null,
     isMe: member.id === user.id,
+    setInStone: !!profiles.get(member.id)?.setAt,
   }));
   const invite = `/join/${crew.inviteCode}`;
   const ghosts = Math.max(0, 3 - members.length);
@@ -65,7 +64,7 @@ export default async function Home() {
     <div className="home">
       {/* first you walk along the plaza, then scrolling lifts you off the sand into the sky */}
       <Altitude stops={[{ y: 0, alt: 0 }, { y: walk, alt: 0 }, { y: walk + 1, alt: 0.3125 }, { y: "end", alt: 0.92 }]} />
-      <Promenade members={members} ghosts={ghosts} live={live} liveEnabled={liveEnabled}>
+      <Promenade members={members} ghosts={ghosts}>
         <div className="hero">
           <GroupSticker name={crew.name} groups={groups.map((g) => ({ id: g.crew.id, name: g.crew.name, current: g.crew.id === crew.id }))} />
           <h1 className="hero-line">
@@ -74,28 +73,53 @@ export default async function Home() {
             <em>your All-Timers?</em>
           </h1>
           <p className="hero-sub">
-            {members.length > 1 ? `${members.length} columns on the plaza. Tap one to climb it.` : "Your column is the first on the plaza. Bring friends."}
+            {members.length > 1 ? `${members.length} lists on the plaza. Tap a column to climb it.` : "The plaza fills up as friends join. Send them the invite."}
           </p>
           {mine && mine.count === 0 && (
-            <Link href="/me/import" className="sticker sticker-steal mt-4 inline-block rotate-1 text-base">
-              Raise your column →
+            <Link href="/me/import" className="btn btn-gold btn-lg mt-5">
+              Raise my column
             </Link>
           )}
         </div>
-        {feed.length > 0 && <Ticker items={feed.map(tickerLine)} />}
+        {news.length > 0 && <Ticker items={news.map(tickerLine)} />}
       </Promenade>
 
       <div className="home-sections">
         <section>
-          <h2 className="tall-h">
-            Fresh moves <span className="sticker sticker-paper rotate-3">{feed.length ? "live" : "quiet so far"}</span>
-          </h2>
-          {feed.length === 0 ? (
-            <p className="paper-note">Nothing yet. Adds, climbs and drops land here the second anyone touches their list.</p>
+          <h2 className="tall-h">The latest</h2>
+          <p className="tall-sub">Lists barely change once they&apos;re made, so every one of these is a big deal.</p>
+          {news.length === 0 ? (
+            <p className="paper-note">Quiet so far. New lists, songs added and lists set in stone show up here.</p>
           ) : (
             <div className="scraps">
-              {feed.map((item, i) => (
-                <Scrap key={item.batchId} item={item} i={i} reacts={reacts[movesTarget(item.batchId)]} mine={item.user.id === user.id} />
+              {news.map((item, i) => (
+                <NewsScrap
+                  key={`${item.type}-${item.user.id}-${item.at.getTime()}`}
+                  item={item}
+                  i={i}
+                  reacts={item.type === "added" ? reacts[movesTarget(item.batchId)] : undefined}
+                  mine={item.user.id === user.id}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="tall-h">Why it&apos;s on there</h2>
+          <p className="tall-sub">The memories and the moments behind the songs. Tap one to climb that column.</p>
+          {whys.length === 0 ? (
+            <p className="paper-note">
+              No whys yet. They&apos;re the best part.{" "}
+              <Link href="/me/stories" className="underline">
+                Write the first one
+              </Link>
+              .
+            </p>
+          ) : (
+            <div className="rail">
+              {whys.map((w, i) => (
+                <WhyCard key={`${w.user.id}-${w.track.id}`} w={w} i={i} />
               ))}
             </div>
           )}
@@ -103,10 +127,10 @@ export default async function Home() {
 
         <section>
           <h2 className="tall-h">Common ground</h2>
-          <p className="tall-sub">Songs more than one of you swear by.</p>
+          <p className="tall-sub">Songs on more than one list.</p>
           {social.shared.length === 0 ? (
             <p className="paper-note">
-              No overlaps yet. {overview.length < 2 ? "It takes two columns." : "Everyone's taste is their own, for now."}
+              No overlaps yet. {overview.length < 2 ? "It takes two lists." : "Everyone's taste is their own, for now."}
             </p>
           ) : (
             <div className="rail">
@@ -124,7 +148,7 @@ export default async function Home() {
                   <span className="mt-2 flex flex-wrap justify-center gap-1">
                     {sh.holders.map((h) => (
                       <Link key={h.user.id} href={`/u/${h.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: h.user.color }}>
-                        {h.user.id === user.id ? "You" : h.user.name} #{h.rank}
+                        {h.user.name} #{h.rank}
                       </Link>
                     ))}
                   </span>
@@ -134,99 +158,26 @@ export default async function Home() {
           )}
         </section>
 
-        <section>
-          <h2 className="tall-h">
-            Steal from friends <span className="sticker sticker-steal -rotate-3">new picks daily</span>
-          </h2>
-          <p className="tall-sub">Their all-timers you don&apos;t have yet. Steal one and it lands in your On Deck, credited to them.</p>
-          {social.picks.length === 0 ? (
-            <p className="paper-note">{overview.length < 2 ? "Once friends add their lists, their best songs show up here." : "You already have everything your friends love. Suspicious."}</p>
-          ) : (
-            <div className="rail">
-              {social.picks.map((pk, i) => (
-                <div key={pk.track.id} className="loot" style={{ rotate: `${((i * 37) % 5) - 2}deg` }}>
-                  {pk.track.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pk.track.imageUrl} alt="" className="loot-art" />
-                  )}
-                  <b>{carvedTitle(pk.track.name)}</b>
-                  <small>{pk.artists}</small>
-                  <Link href={`/u/${pk.from.handle}`} className="sticker sticker-friend mt-2 self-start" style={{ ["--c" as string]: pk.from.color }}>
-                    {pk.from.name}&apos;s #{pk.rank}
-                  </Link>
-                  <span className="mt-2">
-                    <StealButton trackId={pk.track.id} fromUserId={pk.from.id} />
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="tall-h">
-            On repeat <span className="sticker sticker-paper rotate-2">last 4 weeks</span>
-          </h2>
-          <p className="tall-sub">What everyone actually can&apos;t stop playing. Rankings are what you say; this is what you do.</p>
-          {rotation.length === 0 ? (
-            <p className="paper-note">
-              {linked ? "Nobody else has linked stats.fm yet." : "Link stats.fm in "}
-              {!linked && <Link href="/settings#statsfm" className="underline">Settings</Link>}
-              {!linked && " and your heavy rotation shows up here, next to everyone else's."}
-            </p>
-          ) : (
-            <div className="rail">
-              {rotation.map((r, i) => {
-                const mineToo = r.user.id === user.id;
-                return (
-                  <div key={`${r.user.id}-${r.track.id}`} className="loot" style={{ rotate: `${((i * 53) % 5) - 2}deg` }}>
-                    {r.track.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.track.imageUrl} alt="" className="loot-art" />
-                    )}
-                    <b>{carvedTitle(r.track.name)}</b>
-                    <small>{artistLine(r.track.artists)}</small>
-                    <span className="mt-2 flex flex-wrap items-center gap-1">
-                      <Link href={`/u/${r.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: r.user.color }}>
-                        {mineToo ? "You" : r.user.name}
-                      </Link>
-                      <span className="sticker sticker-paper">{r.streams != null ? `${compact(r.streams)} plays` : `their #${r.position} lately`}</span>
-                    </span>
-                    {!mineToo && !social.has(r.track) && (
-                      <span className="mt-2">
-                        <StealButton trackId={r.track.id} fromUserId={r.user.id} />
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {rotation.length > 0 && (
-            <p className="mt-3 text-xs text-muted">
-              Play counts from <a href="https://stats.fm" target="_blank" rel="noopener noreferrer" className="underline">stats.fm</a>, for people who linked it.
-            </p>
-          )}
-        </section>
-
         <section id="invite">
           <h2 className="tall-h">Doors</h2>
           <p className="tall-sub">Every room in the place.</p>
           <Doors
             width={240}
             doors={[
-              { href: `/u/${user.handle}`, label: "Your column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
-              { href: "/month", label: "This month", sub: "rank the group's plays", tone: "sea", inside: <span className="portal-word">♪</span> },
-              { href: "/compare", label: "Compare", sub: "you vs anyone", tone: "dawn", inside: <span className="portal-word">VS</span> },
+              { href: `/u/${user.handle}`, label: "My column", sub: mine?.count ? `${mine.count} songs` : "raise it", cover: mine?.top[0]?.imageUrl, tone: "night" },
               { href: "/me/stories", label: "The why room", sub: "tell the stories", tone: "sea", inside: <span className="portal-word">“ ”</span> },
+              { href: "/me/share", label: "My card", sub: "show off the list", tone: "dawn", inside: <span className="portal-word">✦</span> },
               { href: "/me/import", label: "Add songs", sub: "from Spotify", tone: "night", inside: <span className="portal-word">+</span> },
             ]}
           />
-          <div className="paper-note mt-10 max-w-xl">
-            <b>Bring more people in.</b> Columns get interesting in a crowd.
-            <div className="mt-3">
-              <ShareInvite path={invite} groupName={crew.name} />
-            </div>
+          <div className="note note-blue mt-10 max-w-xl">
+            <b>Bring more people in.</b> Send the invite to the group chat; it shows up as a card with everyone&apos;s #1s.
+            <ShareSheet
+              className="mt-3"
+              path={invite}
+              label="Share the invite"
+              message={`Come put your all-time favorite songs next to ours on All-Timers (${crew.name}):`}
+            />
           </div>
         </section>
       </div>
@@ -247,79 +198,88 @@ function Ticker({ items }: { items: string[] }) {
   );
 }
 
-function tickerLine(item: FeedItem) {
+function tickerLine(item: NewsItem) {
   const who = item.user.name;
-  const adds = item.events.filter((e) => e.type === "add");
-  const moves = item.events.filter((e) => e.type === "move").sort((x, y) => (y.fromPos! - y.toPos!) - (x.fromPos! - x.toPos!));
-  if (adds.length > 3) return `${who} added ${adds.length} songs`;
-  const m = moves[0];
-  if (m) return `${who} moved ${carvedTitle(m.track.name)} ${m.fromPos! > m.toPos! ? "up" : "down"} to #${m.toPos}`;
-  if (adds[0]) return `${who} added ${carvedTitle(adds[0].track.name)} at #${adds[0].toPos}`;
-  const r = item.events.find((e) => e.type === "remove");
-  return r ? `${who} dropped ${carvedTitle(r.track.name)}` : `${who} touched their list`;
+  if (item.type === "stone") return `${who} set their All-Timers in stone`;
+  if (item.type === "joined") return `${who} joined`;
+  if (item.tracks.length > 3) return `${who} added ${item.tracks.length} songs`;
+  const t = item.tracks[0];
+  return `${who} ${item.afterStone ? "inducted" : "added"} ${carvedTitle(t.track.name)} at #${t.pos}`;
 }
 
-function Scrap({ item, i, reacts, mine }: { item: FeedItem; i: number; reacts?: Counts; mine: boolean }) {
+function NewsScrap({ item, i, reacts, mine }: { item: NewsItem; i: number; reacts?: Counts; mine: boolean }) {
+  const name = (
+    <Link href={`/u/${item.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: item.user.color }}>
+      {item.user.name}
+    </Link>
+  );
+  const art = item.type === "stone" ? item.top : item.type === "added" ? item.tracks[0].track : null;
+  let text: React.ReactNode;
+  if (item.type === "stone") {
+    text = (
+      <>
+        {name} set their All-Timers in stone: <b>{item.count} songs</b>, for life.
+      </>
+    );
+  } else if (item.type === "joined") {
+    text = <>{name} joined the group. Their column goes up as soon as they add a list.</>;
+  } else if (item.tracks.length > 5) {
+    text = (
+      <>
+        {name} added {item.tracks.length} songs to their list
+      </>
+    );
+  } else {
+    text = (
+      <>
+        {name} {item.afterStone ? "inducted" : "added"}{" "}
+        {item.tracks.map((t, k) => (
+          <span key={t.track.id}>
+            {k > 0 && (k === item.tracks.length - 1 ? " and " : ", ")}
+            <b>{carvedTitle(t.track.name)}</b> at #{t.pos}
+          </span>
+        ))}
+        {item.afterStone && <span className="text-muted">, to a list set in stone</span>}
+      </>
+    );
+  }
   return (
-    <div className="scrap" style={{ rotate: `${[-1.6, 1.2, -0.6, 1.8, -1.1, 0.7][i % 6]}deg` }}>
+    <div className={`scrap ${item.type === "stone" || (item.type === "added" && item.afterStone) ? "scrap-stone" : ""}`} style={{ rotate: `${[-1.6, 1.2, -0.6, 1.8, -1.1, 0.7][i % 6]}deg` }}>
       <span className="scrap-tape" />
-      <Art track={item.events[0].track} size={64} />
+      {art ? <Art track={art} size={64} /> : <span className="scrap-blank" style={{ ["--c" as string]: item.user.color }} />}
       <div className="min-w-0 flex-1">
-        <FeedText item={item} />
+        <div className="text-[15px] leading-snug">{text}</div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <time className="text-xs text-muted">{timeAgo(item.createdAt)}</time>
-          <Reactions target={movesTarget(item.batchId)} initial={reacts} canReact={!mine} size="sm" />
+          <time className="text-xs text-muted">{timeAgo(item.at)}</time>
+          {item.type === "added" && <Reactions target={movesTarget(item.batchId)} initial={reacts} canReact={!mine} size="sm" />}
         </div>
       </div>
     </div>
   );
 }
 
-const listName = (k: string) => (k === "on_deck" ? "On Deck" : "All-Time list");
-
-function FeedText({ item }: { item: FeedItem }) {
-  const adds = item.events.filter((e) => e.type === "add");
-  const moves = item.events.filter((e) => e.type === "move");
-  const removes = item.events.filter((e) => e.type === "remove");
-  const name = (
-    <Link href={`/u/${item.user.handle}`} className="sticker sticker-friend" style={{ ["--c" as string]: item.user.color }}>
-      {item.user.name}
+function WhyCard({ w, i }: { w: Why; i: number }) {
+  const words = w.love ?? w.story ?? "";
+  return (
+    <Link href={`/u/${w.user.handle}`} className="why-card" style={{ rotate: `${((i * 37) % 5) - 2}deg`, ["--c" as string]: w.user.color }}>
+      <span className="why-head">
+        {w.track.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={w.track.imageUrl} alt="" />
+        )}
+        <span className="min-w-0">
+          <b>{carvedTitle(w.track.name)}</b>
+          <small>{artistLine(w.track.artists)}</small>
+        </span>
+      </span>
+      <q>{words.length > 180 ? `${words.slice(0, 177)}…` : words}</q>
+      {w.moment && <span className="why-moment">Best moment: {w.moment}</span>}
+      <span className="why-foot">
+        <span className="sticker sticker-friend">{w.user.name}&apos;s #{w.rank}</span>
+        {w.from && <span className="text-xs text-muted">put on by {w.from.name}</span>}
+      </span>
     </Link>
   );
-  let text: React.ReactNode;
-  if (adds.length > 5) {
-    text = (
-      <>
-        {name} added {adds.length} songs to their {listName(item.kind)}
-      </>
-    );
-  } else {
-    // Small edits read best one change at a time; the biggest climbs first.
-    const parts: React.ReactNode[] = [];
-    for (const a of adds) parts.push(<>added <b>{carvedTitle(a.track.name)}</b> at #{a.toPos}</>);
-    for (const m of [...moves].sort((x, y) => (y.fromPos! - y.toPos!) - (x.fromPos! - x.toPos!)).slice(0, 3)) {
-      const up = m.fromPos! > m.toPos!;
-      parts.push(
-        <>
-          moved <b>{carvedTitle(m.track.name)}</b> {up ? "up" : "down"} #{m.fromPos} → #{m.toPos}
-        </>,
-      );
-    }
-    for (const r of removes.slice(0, 2)) parts.push(<>dropped <b>{carvedTitle(r.track.name)}</b></>);
-    text = (
-      <>
-        {name}{" "}
-        {parts.map((p, i) => (
-          <span key={i}>
-            {i > 0 && (i === parts.length - 1 ? " and " : ", ")}
-            {p}
-          </span>
-        ))}
-        {item.kind === "on_deck" && <span className="text-muted"> (On Deck)</span>}
-      </>
-    );
-  }
-  return <div className="text-[15px] leading-snug">{text}</div>;
 }
 
 function timeAgo(d: Date) {
@@ -330,50 +290,43 @@ function timeAgo(d: Date) {
   return `${Math.floor(s / 86400)}d`;
 }
 
+/**
+ * The front door for someone not signed in. It says nothing about who's inside: groups
+ * are private, so the way in is an invite link or starting a list of your own.
+ */
 async function SignedOut() {
   const db = await getDb();
-  const crew = (await db.select().from(schema.crews).limit(1))[0];
-  const admin = crew
-    ? (
-        await db
-          .select({ name: schema.users.name })
-          .from(schema.memberships)
-          .innerJoin(schema.users, eq(schema.users.id, schema.memberships.userId))
-          .where(and(eq(schema.memberships.crewId, crew.id), eq(schema.memberships.role, "admin")))
-          .limit(1)
-      )[0]
-    : null;
+  const empty = (await db.select({ id: schema.crews.id }).from(schema.crews).limit(1)).length === 0;
   return (
     <div className="mx-auto max-w-xl py-12">
       <Altitude base={0.3} range={0.1} />
-      <h1 className="tall-h text-[clamp(56px,12vw,120px)]">Everyone&apos;s all-time songs, standing tall.</h1>
-      {crew ? (
-        <p className="paper-note mt-6">
-          This is {crew.name}. To join, ask {admin?.name ?? "whoever runs it"} for the invite link. Already in on another
-          device? Open Settings there and tap &ldquo;Make a link for my other device.&rdquo;
-        </p>
-      ) : (
-        <form action={setupCrew} className="mt-8 space-y-4 rounded-2xl border border-line bg-surface p-6">
-          <div>
-            <h2 className="font-medium">Start your group</h2>
-            <p className="mt-1 text-sm text-muted">
-              You only do this once. You&apos;ll get one invite link; everyone you send it to joins this same group.
-            </p>
-          </div>
-          <label className="block">
-            <span className="text-sm">Your name</span>
-            <input name="name" required className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2" />
+      <h1 className="tall-h text-[clamp(56px,12vw,120px)]">Which songs are your All-Timers?</h1>
+      <p className="tall-sub mt-4">The handful of songs that get you the most, in order, with why each one made it. Set in stone, next to your friends&apos;.</p>
+      {empty ? (
+        <form action={setupCrew} className="note note-blue mt-8 grid gap-4">
+          <b>Start the first group</b>
+          <label className="grid gap-1">
+            <span className="text-sm">My name</span>
+            <input name="name" required maxLength={40} className="field" />
           </label>
-          <label className="block">
+          <label className="grid gap-1">
             <span className="text-sm">Group name (optional)</span>
-            <input
-              name="crewName"
-              placeholder="e.g. The Boys, Saturday Club"
-              className="mt-1 w-full rounded-lg border border-line bg-background px-3 py-2"
-            />
+            <input name="crewName" maxLength={60} placeholder="e.g. The Boys, Saturday Club" className="field" />
           </label>
-          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">Start</button>
+          <button className="btn btn-gold justify-self-start">Start</button>
         </form>
+      ) : (
+        <div className="note note-blue mt-8 grid gap-3">
+          <p>
+            <b>Got an invite link?</b> Open it and you&apos;re in. Already signed in on another device? Open Settings there and make a link
+            for this one.
+          </p>
+          <p>
+            <Link href="/start" className="btn btn-gold">
+              Make my All-Timers
+            </Link>
+          </p>
+        </div>
       )}
     </div>
   );

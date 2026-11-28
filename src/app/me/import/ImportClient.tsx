@@ -43,6 +43,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
         kind,
         preview.tracks.map((t) => t.id),
         mode,
+        preview.playlist?.id ?? null,
       );
       router.push(`/u/${res.handle}${kind === "on_deck" ? "?list=on_deck" : ""}`);
     });
@@ -77,11 +78,11 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
             autoCorrect="off"
             spellCheck={false}
             maxLength={500}
-            className="min-w-0 flex-1 basis-full rounded-full border border-line bg-background px-4 py-2 text-sm outline-none focus:border-accent sm:basis-auto"
+            className="field"
           />
           <button
             type="button"
-            className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent"
+            className="btn btn-marble btn-sm"
             onClick={async () => {
               try {
                 const t = (await navigator.clipboard?.readText())?.trim().slice(0, 500);
@@ -96,7 +97,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
           >
             Paste from clipboard
           </button>
-          <button disabled={!link.trim() || pending} className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-black disabled:opacity-40">
+          <button disabled={!link.trim() || pending} className="btn btn-gold">
             {pending ? "Reading…" : "Read playlist"}
           </button>
         </form>
@@ -144,7 +145,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
             type="button"
             onClick={() => runPreview(text)}
             disabled={!text.trim() || pending}
-            className="rounded-full border border-line px-4 py-2 text-sm disabled:opacity-40"
+            className="btn btn-marble btn-sm"
           >
             {pending ? "Reading…" : "Read links"}
           </button>
@@ -216,7 +217,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
               type="button"
               onClick={() => save("replace")}
               disabled={pending}
-              className="rounded-full bg-accent px-5 py-2 font-medium text-black disabled:opacity-50"
+              className="btn btn-gold"
             >
               {preview.diff.current ? "Replace" : "Save as"} my {kind === "on_deck" ? "On Deck" : "All-Time"} list
             </button>
@@ -224,7 +225,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
               type="button"
               onClick={() => save("append")}
               disabled={pending}
-              className="rounded-full border border-line px-5 py-2 disabled:opacity-50"
+              className="btn btn-marble"
             >
               Add to the bottom of my list
             </button>

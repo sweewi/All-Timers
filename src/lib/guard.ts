@@ -45,7 +45,8 @@ const BUDGETS = {
   write: [120, 60], // reorder, reactions, steals: 120 a minute
   import: [20, 600], // previews and imports: 20 per 10 minutes (each can hit Spotify)
   statsfm: [10, 3600], // connect / force-refresh: 10 an hour
-  monthly: [60, 60],
+  share: [30, 3600], // share links made or reset: 30 an hour
+  render: [240, 600], // card images drawn per person or address: 240 per 10 minutes
   join: [10, 3600], // new members per address per hour
   link: [10, 3600], // login links minted
 } as const satisfies Record<string, readonly [number, number]>;

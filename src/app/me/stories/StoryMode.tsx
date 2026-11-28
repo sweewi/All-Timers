@@ -72,10 +72,10 @@ export function StoryMode({
         <div className="rank-num text-6xl">Every song has its why.</div>
         <p className="mt-4 text-muted">That&apos;s your list told properly. Everyone will see it on your profile.</p>
         <div className="mt-8 flex justify-center gap-3">
-          <Link href={back} className="rounded-full bg-accent px-5 py-2 font-medium text-black">
+          <Link href={back} className="btn btn-gold">
             See my list
           </Link>
-          <button type="button" onClick={() => setFinished(false)} className="rounded-full border border-line px-5 py-2">
+          <button type="button" onClick={() => setFinished(false)} className="btn btn-marble">
             Keep editing
           </button>
         </div>

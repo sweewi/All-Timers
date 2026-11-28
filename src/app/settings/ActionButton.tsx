@@ -11,7 +11,7 @@ export function ActionButton({ run, label }: { run: () => Promise<string>; label
         type="button"
         disabled={pending}
         onClick={() => start(async () => setResult(await run()))}
-        className="rounded-full border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
+        className="btn btn-marble btn-sm"
       >
         {pending ? "Working…" : label}
       </button>

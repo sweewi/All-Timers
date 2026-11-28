@@ -3,23 +3,22 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getCrewMembers, getCrewOverview } from "@/lib/lists";
 import { signOut } from "@/app/actions";
-import { ShareInvite } from "@/components/ShareInvite";
+import { ShareSheet } from "@/components/ShareSheet";
 import { LinkMaker } from "./LinkMaker";
 import { MemberRow } from "./MemberRow";
 import { GroupList } from "./GroupList";
 import { createGroup } from "@/app/actions";
 import { isSiteAdmin, myGroups } from "@/lib/groups";
 import { RenameGroup } from "./RenameGroup";
-import { makeMyLoginLink, refreshSongDetails, syncSpotifyMirrors } from "./actions";
+import { makeMyLoginLink, refreshSongDetails } from "./actions";
 import { ActionButton } from "./ActionButton";
 import { Altitude } from "@/components/World";
 import { StatsfmPanel, type StatsfmView } from "./StatsfmPanel";
 import { getAccount, hasRepeats, visibility } from "@/lib/listening";
 import { timeAgo } from "@/lib/time";
 
-export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
+export default async function SettingsPage() {
   const user = await requireUser();
-  const sp = await searchParams;
   const db = await getDb();
   const crew = (await db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)))[0];
   const members = user.isAdmin ? await getCrewMembers(user.crewId) : [];
@@ -27,8 +26,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     user.isAdmin ? (await getCrewOverview(user.crewId)).map((o) => [o.member.id, o.count] as const) : [],
   );
   const [groups, siteAdmin] = await Promise.all([myGroups(user.id), isSiteAdmin(user.id)]);
-  const spotifyConnected =
-    user.isAdmin && (await db.select().from(schema.settings).where(eq(schema.settings.key, "spotify_refresh_token"))).length > 0;
   const acct = await getAccount(user.id);
   let statsfm: StatsfmView | null = null;
   if (acct) {
@@ -41,9 +38,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       customId: acct.customId,
       imageUrl: acct.imageUrl,
       status: acct.status,
-      showLive: acct.showLive,
       showPlays: acct.showPlays,
-      hidden: { live: !v.live, tops: !v.tops, totals: !v.totals },
+      hidden: { tops: !v.tops, totals: !v.totals },
       streams: v.totals ? acct.lifetimeStreams : null,
       hours: v.totals && acct.lifetimeMs != null ? Math.round(Number(acct.lifetimeMs) / 3_600_000) : null,
       synced: lastSync ? timeAgo(lastSync) : null,
@@ -63,7 +59,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <h1 className="rank-num text-5xl">Settings</h1>
 
       <section className="space-y-3">
-        <h2 className="font-medium">Your other devices</h2>
+        <h2 className="font-medium">Sign in on another device</h2>
         <p className="text-sm text-muted">
           There are no passwords. To use the site on your phone or laptop, make a link here and open it there. It signs in as{" "}
           <b>you</b>, so keep it to yourself.
@@ -77,9 +73,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </section>
 
       <section className="space-y-3" id="groups">
-        <h2 className="font-medium">Your groups</h2>
+        <h2 className="font-medium">Groups</h2>
         <p className="text-sm text-muted">
-          Your All-Timers list is the same in every group; each group has its own plaza, feed and monthly list.
+          Your All-Timers list is the same in every group; each group has its own plaza and feed.
         </p>
         <GroupList groups={groups.map((g) => ({ id: g.crew.id, name: g.crew.name, admin: g.role === "admin", current: g.crew.id === user.crewId }))} />
         <details className="text-sm">
@@ -90,9 +86,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               required
               maxLength={60}
               placeholder="e.g. Roommates' All-Timers"
-              className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 outline-none focus:border-accent"
+              className="field"
             />
-            <button className="rounded-full border border-line px-4 py-2 hover:border-accent">Create</button>
+            <button className="btn btn-marble btn-sm">Create</button>
           </form>
           <p className="mt-1 text-xs text-muted">You&apos;ll be its admin, then invite people with its own link.</p>
         </details>
@@ -101,7 +97,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <section className="space-y-3" id="invite">
         <h2 className="font-medium">Invite new people to {crew.name}</h2>
         <p className="text-sm text-muted">For friends joining for the first time: they pick their name and get their own column.</p>
-        <ShareInvite path={`/join/${crew.inviteCode}`} groupName={crew.name} />
+        <ShareSheet path={`/join/${crew.inviteCode}`} label="Share the invite" message={`Come put your all-time favorite songs next to ours on All-Timers (${crew.name}):`} />
       </section>
 
       {user.isAdmin && (
@@ -127,50 +123,22 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             </ul>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="font-medium">Spotify</h2>
-            {!siteAdmin ? (
-              spotifyConnected ? (
+          {siteAdmin && (
+            <section className="space-y-3">
+              <h2 className="font-medium">Song details</h2>
+              {hasSpotifyApp ? (
                 <div className="flex items-center gap-3">
-                  <ActionButton run={syncSpotifyMirrors} label="Sync this group's playlist now" />
-                  <span className="text-xs text-muted">The site&apos;s hub account keeps each group&apos;s monthly playlist.</span>
+                  <ActionButton run={refreshSongDetails} label="Refresh song details" />
+                  <span className="text-xs text-muted">Fills in artist, album and version for songs added before the Spotify keys were set.</span>
                 </div>
               ) : (
-                <p className="text-sm text-muted">The site&apos;s owner hasn&apos;t connected the Spotify hub yet.</p>
-              )
-            ) : !hasSpotifyApp ? (
-              <p className="text-sm text-muted">
-                Not set up. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to the environment (see README) so imports
-                get artist, album, year and version data.
-              </p>
-            ) : (
-              <>
                 <p className="text-sm text-muted">
-                  Connect the group&apos;s <b>hub</b> Spotify account here, not your personal one. Each month&apos;s playlist lives on
-                  it: created once the pool has songs, growing as it grows, and reordered into the group&apos;s ranking at the reveal.
-                  Everyone saves it from the This month page. Tip: log into Spotify as the hub account in a private window, then
-                  open this page in that same window and connect.
+                  Songs get their details from Spotify&apos;s public pages. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to the
+                  environment (see README) for version data too.
                 </p>
-                <div className="flex items-center gap-3">
-                  <a href="/api/spotify/login" className="rounded-full border border-line px-4 py-2 text-sm hover:border-accent">
-                    {spotifyConnected ? "Reconnect the hub account" : "Connect the hub account"}
-                  </a>
-                  {spotifyConnected && <span className="text-sm text-green-700">Connected</span>}
-                  {sp.spotify === "error" && <span className="text-sm text-red-700">That didn&apos;t work. Try again.</span>}
-                </div>
-                {spotifyConnected && (
-                  <div className="flex items-center gap-3 pt-2">
-                    <ActionButton run={syncSpotifyMirrors} label="Sync playlists now" />
-                    <span className="text-xs text-muted">It also syncs whenever the pool changes and once a day.</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3 pt-2">
-                  <ActionButton run={refreshSongDetails} label="Refresh song details" />
-                  <span className="text-xs text-muted">Fills in artist, album and version for songs added before the keys were set.</span>
-                </div>
-              </>
-            )}
-          </section>
+              )}
+            </section>
+          )}
         </>
       )}
 

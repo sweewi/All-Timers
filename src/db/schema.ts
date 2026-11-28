@@ -39,6 +39,31 @@ export const users = pgTable(
   (t) => [index("users_crew_idx").on(t.crewId)],
 );
 
+/**
+ * How a person's list presents itself: when it was set in stone, the rules they hold it to,
+ * the Spotify playlist it lives in, their public share link, and their share-card style.
+ * One row per person, created the first time any of it is set.
+ */
+export const listProfiles = pgTable("list_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** when they declared the list done; a label and a moment, not a lock */
+  setAt: timestamp("set_at", { withTimezone: true }),
+  /** their own criteria for what earns a spot, in their words */
+  rules: text("rules"),
+  /** the Spotify playlist the list lives in (22-char id) */
+  playlistId: text("playlist_id"),
+  /** JSON array of track ids already seen in that playlist, so only new additions are offered */
+  playlistSeen: text("playlist_seen"),
+  playlistCheckedAt: timestamp("playlist_checked_at", { withTimezone: true }),
+  /** unguessable token for the public read-only page and card images; null = not shared */
+  shareToken: text("share_token").unique(),
+  /** JSON share-card settings: theme, layout, headline */
+  card: text("card"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** One row per signed-in browser. The cookie holds the raw token; we store its hash. */
 export const MEMBER_ROLES = ["member", "admin"] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
@@ -404,3 +429,4 @@ export type Track = typeof tracks.$inferSelect;
 export type Origin = typeof origins.$inferSelect;
 export type StatsfmAccount = typeof statsfmAccounts.$inferSelect;
 export type MonthlyRound = typeof monthlyRounds.$inferSelect;
+export type ListProfile = typeof listProfiles.$inferSelect;

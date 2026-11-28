@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { markGuideSeen } from "@/app/actions";
 import { connectStatsfmAction, makeMyLoginLink } from "@/app/settings/actions";
-import { ShareInvite } from "./ShareInvite";
+import { ShareSheet } from "./ShareSheet";
 
 /**
  * The walkthrough: first get set up (list, phone, stats.fm), then a tour of what to do
@@ -25,11 +25,11 @@ type Status = {
   onDeck: number;
   stories: number;
   statsfm: boolean;
-  voted: boolean;
+  setInStone: boolean;
 };
 
 type Step = {
-  chapter: "Get set up" | "How it works" | "You're in";
+  chapter: "Get set up" | "How it works" | "Welcome in";
   title: string;
   done?: (s: Status) => boolean;
   render: (ctx: { s: Status | null; close: () => void; reload: () => void; path: string }) => React.ReactNode;
@@ -321,11 +321,11 @@ const STEPS: Step[] = [
           <span style={{ height: 88 }} />
         </div>
         <p>
-          {s ? `${s.name}, this` : "This"} is where {s?.crewName ?? "your crew"} keeps everyone&apos;s favorite songs of all time, ranked. Each
-          person&apos;s list stands as a marble column on the plaza: their #1 at the top, in the stars.
+          {s ? `${s.name}, this` : "This"} is where {s?.crewName ?? "the group"} keeps everyone&apos;s favorite songs of all time, in order.
+          Each person&apos;s list stands as a marble column on the plaza: their #1 at the top, in the stars.
         </p>
         <p>
-          The point isn&apos;t the list, it&apos;s the arguments: <i>that&apos;s</i> your #1? How is this not on yours? Who put you on to that?
+          A list says who someone is. The good part is the why: what earns a spot, the memory behind a song, who put you on to it.
         </p>
         <Tip>First a minute of setup, then a quick tour. You can reopen this any time with the ? at the top.</Tip>
       </>
@@ -399,19 +399,13 @@ const STEPS: Step[] = [
     done: (s) => s.statsfm,
     render: ({ s, reload }) => (
       <>
-        <p>If you use stats.fm, link it and the site comes alive with what you actually listen to:</p>
+        <p>If you use stats.fm, link it. It makes building the list easier:</p>
         <ul className="guide-list">
           <li>
-            <b>Receipts</b>: real play counts on your column (&ldquo;412 plays&rdquo;)
+            <b>Suggestions</b>: the songs you&apos;ve played most, ready to add
           </li>
           <li>
-            <b>Live</b>: a now-playing tag over your column on the plaza while you listen
-          </li>
-          <li>
-            <b>On repeat</b>: your heavy rotation, next to everyone else&apos;s
-          </li>
-          <li>
-            <b>The monthly list</b>: your top songs go in the group&apos;s pool automatically
+            <b>Receipts</b>: real play counts on your column (&ldquo;412 plays&rdquo;), if you want them shown
           </li>
         </ul>
         {s?.statsfm ? <p>✓ Linked. Fine-tune what friends see in Settings.</p> : <StatsfmInline reload={reload} />}
@@ -479,6 +473,37 @@ const STEPS: Step[] = [
   },
   {
     chapter: "How it works",
+    title: "Set it in stone",
+    done: (s) => s.setInStone,
+    render: ({ s, close }) => (
+      <>
+        <div className="guide-art">
+          <span className="stone-badge">Set in stone · {new Date().getFullYear()}</span>
+        </div>
+        <p>
+          Give the list a week or two to settle. When it&apos;s right, <b>set it in stone</b> from My column. It&apos;s a label, not a lock: a
+          song can still earn its way on later, and when one does, the group hears about it.
+        </p>
+        <p>Add your rules while you&apos;re there: what does a song need to make your list?</p>
+        {s && <Go href={`/u/${s.handle}`} label="Go to my column" close={close} />}
+      </>
+    ),
+  },
+  {
+    chapter: "How it works",
+    title: "Show it off",
+    render: ({ close }) => (
+      <>
+        <p>
+          <b>My card</b> turns the list into one image for a story or the group chat: pick a look and a layout. There&apos;s also a link
+          anyone can open, so friends who aren&apos;t here yet can see the list (and make their own).
+        </p>
+        <Go href="/me/share" label="Make my card" close={close} />
+      </>
+    ),
+  },
+  {
+    chapter: "How it works",
     title: "Steal from friends",
     render: ({ close }) => (
       <>
@@ -497,52 +522,16 @@ const STEPS: Step[] = [
     ),
   },
   {
-    chapter: "How it works",
-    title: "The monthly list",
-    done: (s) => s.voted,
-    render: ({ close }) => (
-      <>
-        <ol className="guide-list guide-steps">
-          <li>
-            Everyone&apos;s <b>top 5 most-played</b> songs of the month go in a pool, plus up to 3 nominations each.
-          </li>
-          <li>
-            <b>Open the playlist in Spotify</b>, save it, and listen through.
-          </li>
-          <li>
-            <b>Rank your favorites</b> on the site. Ballots are secret.
-          </li>
-          <li>
-            <b>Reveal</b>: 8 pm on the last day of the month. The group&apos;s list appears, and so does everyone&apos;s #1.
-          </li>
-        </ol>
-        <Tip>It&apos;s the easiest way to find out what everyone&apos;s actually been listening to, and to argue about it.</Tip>
-        <Go href="/month" label="This month's list" close={close} />
-      </>
-    ),
-  },
-  {
-    chapter: "How it works",
-    title: "Compare",
-    render: ({ close }) => (
-      <>
-        <div className="guide-art">
-          <span className="guide-vs">VS</span>
-        </div>
-        <p>Pick anyone: the songs you share, where you rank them differently, and the ones each of you is missing.</p>
-        <Go href="/compare" label="Compare with someone" close={close} />
-      </>
-    ),
-  },
-  {
-    chapter: "You're in",
+    chapter: "Welcome in",
     title: "Bring people in",
     render: ({ s }) => (
       <>
         <p>
           Columns get interesting in a crowd{s ? `: ${s.crewName} has ${s.members} so far` : ""}. Anyone can invite people with this link.
         </p>
-        {s?.inviteCode && <ShareInvite path={`/join/${s.inviteCode}`} groupName={s.crewName} />}
+        {s?.inviteCode && (
+          <ShareSheet path={`/join/${s.inviteCode}`} label="Share the invite" message={`Come put your all-time favorite songs next to ours on All-Timers (${s.crewName}):`} />
+        )}
         <Tip>Bring this guide back any time with the ? at the top of every page.</Tip>
       </>
     ),

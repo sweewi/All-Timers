@@ -28,22 +28,32 @@ export async function setupCrew(formData: FormData) {
   const db = await getDb();
   const existing = await db.select({ id: schema.crews.id }).from(schema.crews).limit(1);
   if (existing.length) redirect("/");
+  await founderGroup(formData, "/?error=name");
+}
+
+/**
+ * Someone new starts their own All-Timers (usually after seeing a friend's shared list):
+ * a fresh group with them as its admin, signed in on this device. Rate limited per address.
+ */
+export async function startFresh(formData: FormData) {
+  if (await getCurrentUser()) redirect("/");
+  await founderGroup(formData, "/start?error=name");
+}
+
+async function founderGroup(formData: FormData, onError: string) {
   await budget("join", await clientAddress());
-  const name = String(formData.get("name") || "").trim().slice(0, 40);
-  const crewName = String(formData.get("crewName") || "").trim().slice(0, 60) || (name ? `${name}'s All-Timers` : "All-Timers");
-  if (!name) redirect("/?error=name");
+  const name = String(formData.get("name") || "").trim().replace(/\s+/g, " ").slice(0, 40);
+  if (!name) redirect(onError);
+  const crewName = String(formData.get("crewName") || "").trim().replace(/\s+/g, " ").slice(0, 60) || `${name}'s All-Timers`;
+  const db = await getDb();
   const crewId = newId();
-  await db.insert(schema.crews).values({ id: crewId, name: crewName, inviteCode: newToken(9) });
   const userId = newId();
-  await db.insert(schema.users).values({
-    id: userId,
-    crewId,
-    name,
-    handle: await uniqueHandle(name),
-    color: pickColor(0),
-    isAdmin: true,
+  const handle = await uniqueHandle(name);
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.crews).values({ id: crewId, name: crewName, inviteCode: newToken(9) });
+    await tx.insert(schema.users).values({ id: userId, crewId, name, handle, color: pickColor(0) });
+    await tx.insert(schema.memberships).values({ userId, crewId, role: "admin" });
   });
-  await addMembership(userId, crewId, "admin");
   await startSession(userId);
   redirect("/me/import?first=1");
 }
@@ -163,6 +173,13 @@ export async function toggleReaction(target: string, kind: string) {
   await budget("write", user.id);
   if (!/^(song|moves):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
   const db = await getDb();
+  // only on things that belong to someone else in one of this person's groups
+  const [type, a] = target.split(":");
+  const ownerId =
+    type === "moves"
+      ? (await db.select({ u: schema.rankEvents.userId }).from(schema.rankEvents).where(eq(schema.rankEvents.batchId, a)).limit(1))[0]?.u
+      : a;
+  if (!ownerId || ownerId === user.id || !(await shareAGroup(user.id, ownerId))) return { ok: false as const };
   const mine = and(
     eq(schema.reactions.userId, user.id),
     eq(schema.reactions.target, target),

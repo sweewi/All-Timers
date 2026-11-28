@@ -16,7 +16,7 @@ export function LinkMaker({ make, label }: { make: () => Promise<string>; label:
       type="button"
       disabled={pending}
       onClick={() => start(async () => setLink(await make()))}
-      className="rounded-full border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
+      className="btn btn-marble btn-sm"
     >
       {pending ? "Making…" : label}
     </button>

@@ -5,14 +5,12 @@ import { useEffect, useRef } from "react";
 import WORLD from "@/lib/world-manifest.json";
 import type { GroundMember } from "./Grounds";
 import { promenadeScreens } from "@/lib/promenade";
-import { useLive, artistsOf, type LiveItem } from "./useLive";
 
 type Mini = { key: string; height: number; w: number; h: number; cover: [number, number, number, number]; ground: number; px: number };
 const MINIS: Mini[] = Object.entries(WORLD as Record<string, Record<string, unknown>>)
   .filter(([k]) => k.startsWith("mini-"))
   .map(([k, v]) => ({ key: k, height: parseFloat(k.slice(5).replace("_", ".")), ...(v as Omit<Mini, "key" | "height">) }))
   .sort((a, b) => a.height - b.height);
-
 
 /**
  * The plaza as a walk. The section pins, and scrolling down walks you sideways along a
@@ -24,18 +22,11 @@ export function Promenade({
   members,
   ghosts,
   children,
-  live: initialLive = [],
-  liveEnabled = false,
 }: {
   members: GroundMember[];
   ghosts: number;
   children?: React.ReactNode;
-  live?: LiveItem[];
-  /** someone in the crew has linked stats.fm with live sharing on */
-  liveEnabled?: boolean;
 }) {
-  const live = useLive(initialLive, liveEnabled);
-  const playing = new Map(live.map((l) => [l.handle, l]));
   const root = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
   const screens = promenadeScreens(members.length + ghosts);
@@ -97,21 +88,8 @@ export function Promenade({
               zIndex: back ? 1 : 2,
               ["--bob" as string]: `${(i * 0.7) % 3}s`,
             } as React.CSSProperties;
-            const now = m ? playing.get(m.handle) : undefined;
             const inner = (
               <>
-                {now && (
-                  <span className="mini-live" title={`${m!.isMe ? "You're" : `${m!.name} is`} playing ${now.track.name}`}>
-                    {now.track.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={now.track.imageUrl} alt="" />
-                    )}
-                    <span>
-                      <i className="live-dot" /> {now.track.name}
-                      <small>{artistsOf(now.track.artists)}</small>
-                    </span>
-                  </span>
-                )}
                 <span className="mini-shadow" style={{ top: `${((mini.ground / mini.h) * 100).toFixed(2)}%` }} />
                 <span
                   className="mini-cover"
@@ -129,12 +107,12 @@ export function Promenade({
                 <span className="mini-label" style={{ top: `${((mini.ground / mini.h) * 100).toFixed(2)}%` }}>
                   {m ? (
                     <>
-                      <b style={{ ["--c" as string]: m.color }}>{m.isMe ? "You" : m.name}</b>
-                      <small>{m.count ? `${m.count} songs · climb it` : "no list yet"}</small>
+                      <b style={{ ["--c" as string]: m.color }}>{m.name}</b>
+                      <small>{m.count ? (m.setInStone ? `${m.count} songs · set in stone` : `${m.count} songs · climb it`) : "no list yet"}</small>
                     </>
                   ) : (
                     <>
-                      <b>Your friend</b>
+                      <b>A friend</b>
                       <small>invite them</small>
                     </>
                   )}
@@ -144,7 +122,7 @@ export function Promenade({
             return (
               <div key={m?.handle ?? `ghost-${i}`} className={`promenade-slot ${back ? "is-back" : ""}`}>
                 {m ? (
-                  <Link href={`/u/${m.handle}`} className={`mini ${now ? "is-live" : ""}`} style={style} aria-label={`${m.name}'s column, ${m.count} songs`}>
+                  <Link href={`/u/${m.handle}`} className={`mini ${m.setInStone ? "is-stone" : ""}`} style={style} aria-label={`${m.name}'s column, ${m.count} songs`}>
                     {inner}
                   </Link>
                 ) : (

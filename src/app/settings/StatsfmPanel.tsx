@@ -13,9 +13,8 @@ export type StatsfmView = {
   customId: string | null;
   imageUrl: string | null;
   status: "ok" | "gone" | "error";
-  showLive: boolean;
   showPlays: boolean;
-  hidden: { live: boolean; tops: boolean; totals: boolean };
+  hidden: { tops: boolean; totals: boolean };
   streams: number | null;
   hours: number | null;
   synced: string | null;
@@ -27,7 +26,7 @@ export type StatsfmView = {
   repeats: boolean;
 };
 
-const btn = "rounded-full border border-line px-4 py-2 text-sm hover:border-accent hover:text-accent disabled:opacity-50";
+const btn = "btn btn-marble btn-sm";
 
 export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
   const [value, setValue] = useState("");
@@ -38,8 +37,8 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted">
-          Already on stats.fm? Link your profile and your columns show real play counts, the plaza shows what you&apos;re
-          playing, and your month&apos;s top songs go into the group&apos;s monthly list. Nothing is shared until you link it,
+          Already on stats.fm? Link your profile and building a list gets easier: the songs you&apos;ve played most show up as
+          suggestions, and your column can show how many times you&apos;ve played each one. Nothing is shared until you link it,
           and your stats.fm privacy settings always win.
         </p>
         <form
@@ -61,7 +60,7 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
             autoCorrect="off"
             spellCheck={false}
             maxLength={300}
-            className="min-w-0 flex-1 rounded-full border border-line bg-transparent px-4 py-2 text-sm outline-none focus:border-accent"
+            className="field"
           />
           {(
             <button
@@ -114,7 +113,7 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
       <Health a={account} />
 
       {account.status === "gone" && (
-        <p className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700">
+        <p className="note note-red text-sm">
           stats.fm can&apos;t find this account anymore (renamed or deleted?). Unlink and link it again.
         </p>
       )}
@@ -129,13 +128,6 @@ export function StatsfmPanel({ account }: { account: StatsfmView | null }) {
           disabled={account.hidden.tops}
           note={account.hidden.tops ? "Your stats.fm profile hides top tracks, so there's nothing to show." : undefined}
           set={(v) => setStatsfmSwitch("showPlays", v)}
-        />
-        <Switch
-          label="Show what I'm playing on the plaza"
-          on={account.showLive}
-          disabled={account.hidden.live}
-          note={account.hidden.live ? "Your stats.fm profile hides currently playing." : "Only your crew sees it, and only while you're actually playing."}
-          set={(v) => setStatsfmSwitch("showLive", v)}
         />
       </div>
 
@@ -226,7 +218,7 @@ function Health({ a }: { a: StatsfmView }) {
     notes.push(
       <>
         Lately stats.fm has about one play per song ({a.recentStreams} plays, {a.recentTracks} songs), so there&apos;s no real &ldquo;most
-        played&rdquo; yet. Until there are repeats, your plays won&apos;t pick songs for the monthly list; nominate songs there instead.
+        played&rdquo; yet. Until there are repeats, suggestions lean on your lifetime top songs.
       </>,
     );
   }
@@ -240,7 +232,7 @@ function Health({ a }: { a: StatsfmView }) {
   }
   if (!notes.length) return null;
   return (
-    <ul className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-[#5b4a1f]">
+    <ul className="note note-amber space-y-2 text-sm">
       {notes.map((n, i) => (
         <li key={i}>{n}</li>
       ))}

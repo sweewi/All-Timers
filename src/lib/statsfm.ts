@@ -76,17 +76,6 @@ const StreamStatsSchema = z.object({
   }),
 });
 
-const CurrentSchema = z.object({
-  item: z
-    .object({
-      isPlaying: z.boolean().nullish(),
-      progressMs: z.number().nullish(),
-      track: TrackSchema,
-    })
-    .passthrough()
-    .nullable(),
-});
-
 // ---------------------------------------------------------------------------- input
 
 /**
@@ -238,9 +227,4 @@ export async function getLifetimeTotals(id: string, range: "lifetime" | "weeks" 
     ms: data.items.durationMs ?? null,
     uniqueTracks: data.items.cardinality?.tracks ?? null,
   };
-}
-
-export async function getCurrentlyPlaying(id: string) {
-  const { data } = await get(`/users/${enc(id)}/streams/current`, CurrentSchema);
-  return data.item;
 }
