@@ -36,10 +36,14 @@ function rng(seed: number) {
 }
 
 const STORIES = [
-  { foundVia: "friend", love: "That first chorus hits like a wave.", story: "Played it on loop the whole drive back from the coast." },
-  { foundVia: "grew_up", love: "Sounds like Saturday mornings.", story: "My parents had this on every road trip." },
-  { foundVia: "live", love: "The crowd sang the last verse back.", story: "Saw it live in a tiny room and never recovered." },
-  { foundVia: "playlist", love: "The way it builds and never quite breaks.", story: "Snuck up on me in a random playlist at the gym." },
+  { foundVia: "friend", love: "That first chorus hits like a wave.", story: "Played it on loop the whole drive back from the coast.", moment: "the key change" },
+  { foundVia: "grew_up", love: "Sounds like Saturday mornings.", story: "My parents had this on every road trip.", moment: null },
+  { foundVia: "live", love: "The crowd sang the last verse back.", story: "Saw it live in a tiny room and never recovered.", moment: "the last verse" },
+  { foundVia: "playlist", love: "The way it builds and never quite breaks.", story: "Snuck up on me in a random playlist at the gym.", moment: null },
+  { foundVia: "friend", love: "It's the song I put on when I need to remember who I am.", story: "Sophomore year, walking home at 3 a.m. in the snow.", moment: "the bridge" },
+  { foundVia: "screen", love: "Ten seconds in and I'm somewhere else.", story: "Heard it at the end of a film and sat through the whole credits.", moment: "the opening synth" },
+  { foundVia: "grew_up", love: "My dad's favorite. Now it's mine.", story: "He played it every Sunday while making pancakes.", moment: null },
+  { foundVia: "myself", love: "Perfect from the first note to the fade.", story: null, moment: "the drum fill at 2:10" },
 ] as const;
 
 type Db = { insert: (t: never) => { values: (v: never) => Promise<unknown> } };
@@ -82,7 +86,7 @@ export async function seedDemo(dbIn: unknown) {
   for (const [handle, ids] of lists) {
     const userId = demoUserId(handle);
     const batchId = `demo-batch-${handle}`;
-    const at = ago(2 + rand() * 72);
+    const at = ago(24 * 12 + rand() * 96); // lists went up before anyone set theirs in stone
     for (const [i, trackId] of ids.entries()) {
       entries.push({ userId, kind: "all_time", trackId, position: i + 1, addedAt: at });
       if (i < 5) events.push({ id: `demo-ev-${handle}-${i}`, batchId, userId, kind: "all_time", trackId, type: "add", toPos: i + 1, createdAt: at });
@@ -91,12 +95,14 @@ export async function seedDemo(dbIn: unknown) {
   await ins(schema.listEntries, entries);
   await ins(schema.rankEvents, events);
 
-  // a story on each person's number one, a put-on between friends
-  const origins = lists.map(([handle, ids], i) => {
-    const s = STORIES[i % STORIES.length];
-    const from = s.foundVia === "friend" ? demoUserId(lists[(i + 1) % lists.length][0]) : null;
-    return { id: `demo-origin-${handle}`, userId: demoUserId(handle), trackId: ids[0], fromUserId: from, foundVia: s.foundVia, love: s.love, story: s.story, updatedAt: ago(5 + i) };
-  });
+  // whys on each person's top three, a put-on between friends now and then
+  const origins = lists.flatMap(([handle, ids], i) =>
+    ids.slice(0, 3).map((trackId, k) => {
+      const s = STORIES[(i * 3 + k) % STORIES.length];
+      const from = s.foundVia === "friend" ? demoUserId(lists[(i + 1) % lists.length][0]) : null;
+      return { id: `demo-origin-${handle}-${k}`, userId: demoUserId(handle), trackId, fromUserId: from, foundVia: s.foundVia, love: s.love, story: s.story, moment: s.moment, updatedAt: ago(5 + i * 7 + k * 3) };
+    }),
+  );
   await ins(schema.origins, origins);
 
   const reactions = [];
@@ -108,4 +114,20 @@ export async function seedDemo(dbIn: unknown) {
     }
   await ins(schema.reactions, reactions);
 
+  // list identities: two lists already set in stone, rules in people's own words
+  await ins(schema.listProfiles, [
+    { userId: demoUserId("sam"), setAt: ago(24 * 9), rules: "Songs I'd still play at 80. If I ever skipped it, it's out.", shareToken: "demo-share-sam-0001" },
+    { userId: demoUserId("maya"), setAt: ago(30), rules: "Every one of these got me through something." },
+    { userId: demoUserId("ava"), rules: "First listen gave me chills, tenth listen still does." },
+    { userId: demoUserId("theo"), rules: "No guilty pleasures. Only songs I'd defend." },
+  ]);
+  // a song added to a list already set in stone
+  const samList = data.lists.sam ?? [];
+  const inducted = data.tracks.find((t) => !samList.includes(t.id));
+  if (inducted) {
+    await ins(schema.listEntries, [{ userId: demoUserId("sam"), kind: "all_time", trackId: inducted.id, position: samList.length + 1, addedAt: ago(20) }]);
+    await ins(schema.rankEvents, [
+      { id: "demo-ev-sam-induct", batchId: "demo-batch-sam-induct", userId: demoUserId("sam"), kind: "all_time", trackId: inducted.id, type: "add", toPos: samList.length + 1, createdAt: ago(20) },
+    ]);
+  }
 }

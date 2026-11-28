@@ -14,6 +14,8 @@ export type GroundMember = {
   count: number;
   cover: string | null;
   isMe: boolean;
+  /** their list is set in stone */
+  setInStone?: boolean;
 };
 
 /** Where each column stands: x across the plain (%), how near it is (1 = front row). */

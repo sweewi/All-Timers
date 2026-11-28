@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { markGuideSeen } from "@/app/actions";
 import { connectStatsfmAction, makeMyLoginLink } from "@/app/settings/actions";
-import { ShareInvite } from "./ShareInvite";
+import { ShareSheet } from "./ShareSheet";
 
 /**
  * The walkthrough: first get set up (list, phone, stats.fm), then a tour of what to do
@@ -25,7 +25,7 @@ type Status = {
   onDeck: number;
   stories: number;
   statsfm: boolean;
-  voted: boolean;
+  setInStone: boolean;
 };
 
 type Step = {
@@ -399,19 +399,13 @@ const STEPS: Step[] = [
     done: (s) => s.statsfm,
     render: ({ s, reload }) => (
       <>
-        <p>If you use stats.fm, link it and the site comes alive with what you actually listen to:</p>
+        <p>If you use stats.fm, link it. It makes building the list easier:</p>
         <ul className="guide-list">
           <li>
-            <b>Receipts</b>: real play counts on your column (&ldquo;412 plays&rdquo;)
+            <b>Suggestions</b>: the songs you&apos;ve played most, ready to add
           </li>
           <li>
-            <b>Live</b>: a now-playing tag over your column on the plaza while you listen
-          </li>
-          <li>
-            <b>On repeat</b>: your heavy rotation, next to everyone else&apos;s
-          </li>
-          <li>
-            <b>The monthly list</b>: your top songs go in the group&apos;s pool automatically
+            <b>Receipts</b>: real play counts on your column (&ldquo;412 plays&rdquo;), if you want them shown
           </li>
         </ul>
         {s?.statsfm ? <p>✓ Linked. Fine-tune what friends see in Settings.</p> : <StatsfmInline reload={reload} />}
@@ -497,44 +491,6 @@ const STEPS: Step[] = [
     ),
   },
   {
-    chapter: "How it works",
-    title: "The monthly list",
-    done: (s) => s.voted,
-    render: ({ close }) => (
-      <>
-        <ol className="guide-list guide-steps">
-          <li>
-            Everyone&apos;s <b>top 5 most-played</b> songs of the month go in a pool, plus up to 3 nominations each.
-          </li>
-          <li>
-            <b>Open the playlist in Spotify</b>, save it, and listen through.
-          </li>
-          <li>
-            <b>Rank your favorites</b> on the site. Ballots are secret.
-          </li>
-          <li>
-            <b>Reveal</b>: 8 pm on the last day of the month. The group&apos;s list appears, and so does everyone&apos;s #1.
-          </li>
-        </ol>
-        <Tip>It&apos;s the easiest way to find out what everyone&apos;s actually been listening to, and to argue about it.</Tip>
-        <Go href="/month" label="This month's list" close={close} />
-      </>
-    ),
-  },
-  {
-    chapter: "How it works",
-    title: "Compare",
-    render: ({ close }) => (
-      <>
-        <div className="guide-art">
-          <span className="guide-vs">VS</span>
-        </div>
-        <p>Pick anyone: the songs you share, where you rank them differently, and the ones each of you is missing.</p>
-        <Go href="/compare" label="Compare with someone" close={close} />
-      </>
-    ),
-  },
-  {
     chapter: "Welcome in",
     title: "Bring people in",
     render: ({ s }) => (
@@ -542,7 +498,9 @@ const STEPS: Step[] = [
         <p>
           Columns get interesting in a crowd{s ? `: ${s.crewName} has ${s.members} so far` : ""}. Anyone can invite people with this link.
         </p>
-        {s?.inviteCode && <ShareInvite path={`/join/${s.inviteCode}`} groupName={s.crewName} />}
+        {s?.inviteCode && (
+          <ShareSheet path={`/join/${s.inviteCode}`} label="Share the invite" message={`Come put your all-time favorite songs next to ours on All-Timers (${s.crewName}):`} />
+        )}
         <Tip>Bring this guide back any time with the ? at the top of every page.</Tip>
       </>
     ),

@@ -123,10 +123,6 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
                 On Deck ({onDeck.length})
               </Link>
             )}
-            {isMe ? null : (
-              <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className={btn}>Compare with me</Link>
-            )}
-
           </>
         }
       />
@@ -164,11 +160,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
                 Import from Spotify
               </Link>
             </>
-          ) : (
-            <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className="btn btn-marble btn-sm">
-              Compare with me
-            </Link>
-          )}
+          ) : null}
           {allTime.length > 0 && (
             <Link href={`/u/${handle}`} className="btn btn-marble btn-sm">
               Monument view

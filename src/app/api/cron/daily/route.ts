@@ -1,10 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { monthKeyOf, refreshCrew, sweepOldListening } from "@/lib/listening";
-import { ensureRound, refreshPool, revealIfDue } from "@/lib/monthly";
-import { mirrorCrew } from "@/lib/mirror";
+import { refreshCrew, sweepOldListening } from "@/lib/listening";
 
 export const maxDuration = 60;
 
@@ -19,8 +17,7 @@ function authorized(req: NextRequest) {
 }
 
 /**
- * Once a day (Vercel Cron, see vercel.json): refresh stale listening data politely,
- * grow this month's pools, reveal finished months, sync the Spotify hub, tidy up.
+ * Once a day (Vercel Cron, see vercel.json): refresh stale stats.fm data politely and tidy up.
  * Every step is independent: one failing never stops the rest.
  */
 export async function GET(req: NextRequest) {
@@ -36,25 +33,8 @@ export async function GET(req: NextRequest) {
       report[name] = "failed";
     }
   };
-  const now = monthKeyOf();
-  const prev = monthKeyOf(Date.now() - 20 * 86_400_000);
-  for (const c of crews) {
-    await step(`listening:${c.id}`, () => refreshCrew(c.id));
-    await step(`month:${c.id}`, async () => {
-      // last month first: it may have just ended and still need its reveal
-      const rounds = await db.select().from(schema.monthlyRounds).where(eq(schema.monthlyRounds.crewId, c.id));
-      for (const r of rounds.filter((x) => x.status === "open")) await revealIfDue(r);
-      const cur = await ensureRound(c.id, now);
-      await refreshPool(cur);
-      return { current: now, checkedPrev: prev };
-    });
-    // after the pools and reveals above, so playlists reflect today's state
-    await step(`mirror:${c.id}`, () => mirrorCrew(c.id));
-  }
+  for (const c of crews) await step(`listening:${c.id}`, () => refreshCrew(c.id));
   await step("sweep", sweepOldListening);
-  await step("ratelimits", async () => {
-    const { lt } = await import("drizzle-orm");
-    await db.delete(schema.rateLimits).where(lt(schema.rateLimits.windowStart, new Date(Date.now() - 86_400_000)));
-  });
+  await step("ratelimits", () => db.delete(schema.rateLimits).where(lt(schema.rateLimits.windowStart, new Date(Date.now() - 86_400_000))));
   return NextResponse.json({ ok: true, report });
 }

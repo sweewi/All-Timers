@@ -4,7 +4,6 @@ import { getDb, schema } from "@/db";
 import type { StatsfmAccount, Track } from "@/db/schema";
 import { songKey } from "./songs";
 import {
-  getCurrentlyPlaying,
   getLifetimeTotals,
   getProfile,
   getTopTracks,
@@ -272,7 +271,7 @@ async function markError(userId: string, err: unknown) {
  * Bring one person's cached listening up to date. Only stale pieces are fetched.
  * Never throws: a failure is recorded on the account and retried next time.
  */
-export async function refreshListening(userId: string, opts: { force?: boolean; only?: ("profile" | Period | "month")[] } = {}) {
+export async function refreshListening(userId: string, opts: { force?: boolean; only?: ("profile" | Period)[] } = {}) {
   const db = await getDb();
   const acct = await getAccount(userId);
   if (!acct || acct.status === "gone") return { refreshed: [] as string[] };
@@ -280,9 +279,8 @@ export async function refreshListening(userId: string, opts: { force?: boolean; 
   const fetchedAt = new Map(syncs.map((s) => [s.period, s.fetchedAt.getTime()]));
   const now = Date.now();
   const stale = (period: string, ttl: number) => opts.force || now - (fetchedAt.get(period) ?? 0) > ttl;
-  const want = (k: "profile" | Period | "month") => !opts.only || opts.only.includes(k);
+  const want = (k: "profile" | Period) => !opts.only || opts.only.includes(k);
   const refreshed: string[] = [];
-  const month = `m:${monthKeyOf()}` as Period;
   try {
     if (want("profile") && (opts.force || now - acct.checkedAt.getTime() > TTL.profile)) {
       const p = await getProfile(acct.statsfmId);
@@ -331,10 +329,6 @@ export async function refreshListening(userId: string, opts: { force?: boolean; 
       await storeTop(userId, "weeks", await getTopTracks(acct.statsfmId, "weeks", 50));
       refreshed.push("weeks");
     }
-    if (want("month") && stale(month, TTL.month)) {
-      await storeTop(userId, month, await getTopTracks(acct.statsfmId, monthWindow(month.slice(2)), 50));
-      refreshed.push(month);
-    }
   } catch (e) {
     if (!(e instanceof StatsfmUnavailable)) {
       console.error("statsfm refresh", { userId, err: String(e) });
@@ -345,7 +339,7 @@ export async function refreshListening(userId: string, opts: { force?: boolean; 
 }
 
 /** Refresh everyone in a crew, one person at a time (polite), for the cron or after a page. */
-export async function refreshCrew(crewId: string, opts: { only?: ("profile" | Period | "month")[] } = {}) {
+export async function refreshCrew(crewId: string, opts: { only?: ("profile" | Period)[] } = {}) {
   const db = await getDb();
   const members = await db
     .select({ userId: schema.statsfmAccounts.userId })
@@ -354,24 +348,6 @@ export async function refreshCrew(crewId: string, opts: { only?: ("profile" | Pe
     .where(inGroup(crewId));
   for (const m of members) await refreshListening(m.userId, opts);
   return members.length;
-}
-
-/** Fetch a past calendar month for someone (used to build a round after the fact). */
-export async function fetchMonth(userId: string, key: string) {
-  const acct = await getAccount(userId);
-  if (!acct || !visibility(acct).tops) return;
-  const period = `m:${key}` as Period;
-  const db = await getDb();
-  const sync = (await db.select().from(schema.listenSyncs).where(and(eq(schema.listenSyncs.userId, userId), eq(schema.listenSyncs.period, period))))[0];
-  const { before } = monthWindow(key);
-  // a finished month stops changing a few days after it ends
-  const settled = sync && sync.fetchedAt.getTime() > before + 3 * 86_400_000;
-  if (settled || (sync && Date.now() - sync.fetchedAt.getTime() < TTL.month)) return;
-  try {
-    await storeTop(userId, period, await getTopTracks(acct.statsfmId, monthWindow(key), 50));
-  } catch (e) {
-    if (!(e instanceof StatsfmUnavailable)) console.error("statsfm month", { userId, key, err: String(e) });
-  }
 }
 
 // ---------------------------------------------------------------------------- reads
@@ -437,47 +413,6 @@ export async function getTop(userId: string, period: Period, limit = 20) {
     .limit(limit);
 }
 
-export type Live = { userId: string; track: Track | null; isPlaying: boolean; fetchedAt: Date };
-
-/**
- * What the crew is playing right now. Reads the cache; refreshes members whose entry
- * is older than a minute (at most `budget` of them per call, so a page never fans out).
- */
-export async function getLive(crewId: string, budget = 4): Promise<Live[]> {
-  const db = await getDb();
-  const accts = await db
-    .select({ a: schema.statsfmAccounts })
-    .from(schema.statsfmAccounts)
-    .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(inGroup(crewId));
-  const visible = accts.map((r) => r.a).filter((a) => visibility(a).live);
-  if (!visible.length) return [];
-  const cached = await db.select().from(schema.nowPlaying).where(inArray(schema.nowPlaying.userId, visible.map((a) => a.userId)));
-  const byUser = new Map(cached.map((c) => [c.userId, c]));
-  const stale = budget > 0 ? visible.filter((a) => Date.now() - (byUser.get(a.userId)?.fetchedAt.getTime() ?? 0) > TTL.now).slice(0, budget) : [];
-  await Promise.all(
-    stale.map(async (a) => {
-      try {
-        const cur = await getCurrentlyPlaying(a.statsfmId);
-        const id = cur ? spotifyIdOf(cur.track) : null;
-        if (cur && id) await upsertTracks([cur.track]);
-        const row = { trackId: id, isPlaying: !!cur && cur.isPlaying !== false && !!id, progressMs: cur?.progressMs ?? null, fetchedAt: new Date() };
-        await db.insert(schema.nowPlaying).values({ userId: a.userId, ...row }).onConflictDoUpdate({ target: schema.nowPlaying.userId, set: row });
-        byUser.set(a.userId, { userId: a.userId, ...row });
-      } catch (e) {
-        if (!(e instanceof StatsfmUnavailable)) console.error("statsfm live", { userId: a.userId, err: String(e) });
-      }
-    }),
-  );
-  const trackIds = [...byUser.values()].map((c) => c.trackId).filter((x): x is string => !!x);
-  const tracks = trackIds.length ? await db.select().from(schema.tracks).where(inArray(schema.tracks.id, trackIds)) : [];
-  const t = new Map(tracks.map((x) => [x.id, x]));
-  return visible.map((a) => {
-    const c = byUser.get(a.userId);
-    return { userId: a.userId, track: c?.trackId ? (t.get(c.trackId) ?? null) : null, isPlaying: !!c?.isPlaying, fetchedAt: c?.fetchedAt ?? new Date(0) };
-  });
-}
-
 /** Members whose listening is stale enough to be worth a refresh after this page. */
 export async function staleMembers(crewId: string, limit = 2) {
   const db = await getDb();
@@ -515,30 +450,6 @@ export async function sweepOldListening() {
 }
 
 
-
-/** Only what's actually playing, recently confirmed. Safe to send to the browser. */
-export async function getLiveNow(crewId: string, budget = 4) {
-  const live = await getLive(crewId, budget);
-  const fresh = Date.now() - 5 * 60_000;
-  const playing = live.filter((l) => l.isPlaying && l.track && l.fetchedAt.getTime() > fresh);
-  if (!playing.length) return [];
-  const db = await getDb();
-  const people = await db
-    .select({ id: schema.users.id, handle: schema.users.handle, name: schema.users.name, color: schema.users.color })
-    .from(schema.users)
-    .where(inArray(schema.users.id, playing.map((l) => l.userId)));
-  const who = new Map(people.map((p) => [p.id, p]));
-  return playing
-    .filter((l) => who.has(l.userId))
-    .map((l) => ({
-      handle: who.get(l.userId)!.handle,
-      name: who.get(l.userId)!.name,
-      color: who.get(l.userId)!.color,
-      track: { id: l.track!.id, name: l.track!.name, artists: l.track!.artists, imageUrl: l.track!.imageUrl },
-    }));
-}
-export type LiveNow = Awaited<ReturnType<typeof getLiveNow>>[number];
-
 /**
  * Does stats.fm's data for this person show any favorites lately? If the last four
  * weeks hold about as many plays as distinct songs (every song once), "most played"
@@ -547,33 +458,6 @@ export type LiveNow = Awaited<ReturnType<typeof getLiveNow>>[number];
 export function hasRepeats(a: Pick<StatsfmAccount, "recentStreams" | "recentTracks">) {
   if (!a.recentStreams || !a.recentTracks) return true; // unknown: give it the benefit of the doubt
   return a.recentStreams / a.recentTracks >= 1.2;
-}
-
-/**
- * On repeat: what each crew member has played most over the last four weeks.
- * Up to `perPerson` songs each, highest plays first, with who's behind them.
- */
-export async function heavyRotation(crewId: string, perPerson = 3) {
-  const db = await getDb();
-  const rows = await db
-    .select({ a: schema.statsfmAccounts, user: schema.users })
-    .from(schema.statsfmAccounts)
-    .innerJoin(schema.users, eq(schema.users.id, schema.statsfmAccounts.userId))
-    .where(inGroup(crewId));
-  const out: { user: (typeof rows)[number]["user"]; track: Track; streams: number | null; position: number }[] = [];
-  for (const { a, user } of rows) {
-    if (!visibility(a).plays || !hasRepeats(a)) continue;
-    const top = await db
-      .select({ position: schema.listenTops.position, streams: schema.listenTops.streams, track: schema.tracks })
-      .from(schema.listenTops)
-      .innerJoin(schema.tracks, eq(schema.tracks.id, schema.listenTops.trackId))
-      .where(and(eq(schema.listenTops.userId, a.userId), eq(schema.listenTops.period, "weeks")))
-      .orderBy(asc(schema.listenTops.position))
-      .limit(perPerson);
-    for (const t of top) if (t.streams == null || t.streams >= 2) out.push({ user, track: t.track, streams: t.streams, position: t.position });
-  }
-  // interleave people so one heavy listener doesn't fill the rail
-  return out.sort((x, y) => x.position - y.position || (y.streams ?? 0) - (x.streams ?? 0));
 }
 
 /**

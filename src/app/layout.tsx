@@ -72,12 +72,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href={`/u/${user.handle}`} className="text-muted hover:text-foreground">
                   My column
                 </Link>
-                <Link href="/month" className="text-muted hover:text-foreground">
-                  This month
-                </Link>
-                <Link href="/compare" className="hidden text-muted hover:text-foreground sm:inline">
-                  Compare
-                </Link>
                 <Link href="/me/stories" className="hidden text-muted hover:text-foreground md:inline">
                   Why room
                 </Link>
