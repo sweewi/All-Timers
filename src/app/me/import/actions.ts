@@ -12,6 +12,7 @@ import { RateLimited } from "@/lib/ratelimit";
 import { artistLine } from "@/lib/songs";
 import { budget, parse, zKind, zTrackIds } from "@/lib/guard";
 import { z } from "zod";
+import { patchProfile } from "@/lib/profile";
 
 export type PreviewTrack = { id: string; name: string; artists: string; album: string; year: number | null; imageUrl: string | null; known: boolean };
 export type PreviewResult = {
@@ -21,7 +22,7 @@ export type PreviewResult = {
   unrecognized: number;
   alreadyOnList: number;
   /** set when a playlist link was read */
-  playlist?: { name: string; imageUrl: string | null; total: number | null; truncated: boolean };
+  playlist?: { id: string; name: string; imageUrl: string | null; total: number | null; truncated: boolean };
   /** what "replace" would do to the current list */
   diff: { added: number; removed: number; current: number };
   error?: string;
@@ -75,7 +76,7 @@ export async function previewImport(textIn: string, kindIn: ListKind): Promise<P
           };
         }),
         alreadyOnList: ids.filter((id) => have.has(id)).length,
-        playlist: { name: pl.name, imageUrl: pl.imageUrl, total: pl.total, truncated: pl.truncated },
+        playlist: { id: playlistId, name: pl.name, imageUrl: pl.imageUrl, total: pl.total, truncated: pl.truncated },
         diff: diffOf(ids),
       };
     } catch (e) {
@@ -103,12 +104,17 @@ export async function previewImport(textIn: string, kindIn: ListKind): Promise<P
   };
 }
 
-/** replace: the pasted order becomes the list. append: new songs go to the bottom. */
-export async function saveImport(kindIn: ListKind, idsIn: string[], modeIn: "replace" | "append") {
+/**
+ * replace: the pasted order becomes the list. append: new songs go to the bottom.
+ * When the All-Time list came from a playlist, remember it: the column links to it and
+ * songs added to it later are offered.
+ */
+export async function saveImport(kindIn: ListKind, idsIn: string[], modeIn: "replace" | "append", playlistIdIn?: string | null) {
   const user = await requireUser();
   const kind = parse(zKind, kindIn);
   const ids = parse(zTrackIds, idsIn);
   const mode = parse(z.enum(["replace", "append"]), modeIn);
+  const playlistId = playlistIdIn ? parse(z.string().regex(/^[A-Za-z0-9]{22}$/), playlistIdIn) : null;
   await budget("import", user.id);
   const db = await getDb();
   let order = ids;
@@ -130,6 +136,9 @@ export async function saveImport(kindIn: ListKind, idsIn: string[], modeIn: "rep
   if (missing.length) await resolveTracks(missing.slice(0, 300));
   const exists = new Set([...known, ...missing]);
   await saveList(user.id, kind, order.filter((id) => exists.has(id)));
+  if (playlistId && kind === "all_time") {
+    await patchProfile(user.id, { playlistId, playlistSeen: JSON.stringify(ids), playlistCheckedAt: new Date() });
+  }
   after(() => backfillTracks(120));
   return { handle: user.handle };
 }

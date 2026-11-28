@@ -89,3 +89,8 @@ export async function ownerOfShareToken(token: string) {
   )[0];
   return row ?? null;
 }
+
+/** Worth looking at the playlist again for new songs (last look over six hours ago). */
+export function playlistIsStale(p: Pick<ListProfile, "playlistCheckedAt"> | null | undefined) {
+  return !p?.playlistCheckedAt || Date.now() - p.playlistCheckedAt.getTime() > 6 * 3_600_000;
+}

@@ -10,6 +10,10 @@ import { cardOf, ensureShareToken, getProfile, patchProfile, resetShareToken, zC
 import { fetchPlaylist, parsePlaylistInput, PlaylistError, savePlaylistTracks } from "@/lib/playlist";
 import { backfillTracks } from "@/lib/spotify";
 import { RateLimited } from "@/lib/ratelimit";
+import { inArray } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import type { Track } from "@/db/schema";
+import { artistLine } from "@/lib/songs";
 
 /**
  * A list's identity: setting it in stone, the rules it's held to, the Spotify playlist
@@ -129,7 +133,17 @@ export async function checkPlaylist(): Promise<PlaylistCheck> {
     const fresh = pl.tracks.filter((t) => !seen.has(t.id) && !have.has(t.id));
     await patchProfile(user.id, { playlistCheckedAt: new Date() });
     after(() => backfillTracks(40));
-    return { ok: true, name: pl.name, fresh: fresh.map((t) => ({ id: t.id, name: t.name, artists: t.artists.join(", "), imageUrl: null })) };
+    const known = fresh.length ? await knownTracks(fresh.map((t) => t.id)) : new Map<string, Track>();
+    return {
+      ok: true,
+      name: pl.name,
+      fresh: fresh.slice(0, 50).map((t) => ({
+        id: t.id,
+        name: known.get(t.id)?.name ?? t.name,
+        artists: known.has(t.id) ? artistLine(known.get(t.id)!.artists) : t.artists.join(", "),
+        imageUrl: known.get(t.id)?.imageUrl ?? null,
+      })),
+    };
   } catch (e) {
     if (e instanceof PlaylistError) return { ok: false, message: e.message };
     throw e;
@@ -157,6 +171,12 @@ export async function addFromPlaylist(addIn: string[], offeredIn: string[]) {
   await patchProfile(user.id, { playlistSeen: JSON.stringify([...seen].slice(-2000)) });
   refresh();
   return ok.length;
+}
+
+async function knownTracks(ids: string[]) {
+  const db = await getDb();
+  const rows = await db.select().from(schema.tracks).where(inArray(schema.tracks.id, ids));
+  return new Map(rows.map((r) => [r.id, r]));
 }
 
 function safeIds(json: string | null | undefined): string[] {

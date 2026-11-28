@@ -603,6 +603,14 @@ function Plaque({
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
         />
+        <a
+          href={`https://open.spotify.com/track/${song.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-block text-sm text-[#5b5143] underline underline-offset-2"
+        >
+          Play the whole song in Spotify
+        </a>
         <div className="mt-4 flex justify-between text-sm">
           {isMe ? (
             <Link href={`${storyHref}&track=${song.id}`} className="text-[#8a6a2a] underline-offset-4 hover:underline">

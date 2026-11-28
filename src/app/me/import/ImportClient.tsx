@@ -43,6 +43,7 @@ export function ImportClient({ kind, handle }: { kind: ListKind; handle: string 
         kind,
         preview.tracks.map((t) => t.id),
         mode,
+        preview.playlist?.id ?? null,
       );
       router.push(`/u/${res.handle}${kind === "on_deck" ? "?list=on_deck" : ""}`);
     });

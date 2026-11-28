@@ -9,6 +9,8 @@ import { hasStory, toStoryValues } from "@/lib/story-values";
 import { Altitude } from "@/components/World";
 import { getAccount, onDeckSuggestions } from "@/lib/listening";
 import { Suggestions } from "./Suggestions";
+import { PlaylistPanel } from "./PlaylistPanel";
+import { getProfile, playlistIsStale } from "@/lib/profile";
 
 export default async function EditPage({ searchParams }: PageProps<"/me/edit">) {
   const user = await requireUser();
@@ -21,7 +23,12 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
     db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)),
   ]);
 
-  const [other, acct] = await Promise.all([getList(user.id, kind === "on_deck" ? "all_time" : "on_deck"), getAccount(user.id)]);
+  const [other, acct, profile] = await Promise.all([
+    getList(user.id, kind === "on_deck" ? "all_time" : "on_deck"),
+    getAccount(user.id),
+    getProfile(user.id),
+  ]);
+  const playlistStale = playlistIsStale(profile);
   const have = new Set([...entries, ...other].map((e) => e.track.id));
   const suggestions = acct ? await onDeckSuggestions(user.id, have, 8) : [];
 
@@ -41,7 +48,7 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={`/u/${user.handle}`} className="text-sm text-muted">
-            ← Back to your column
+            ← Back to my column
           </Link>
           <h1 className="rank-num mt-1 text-5xl">{kind === "on_deck" ? "On Deck" : "My All-Timers"}</h1>
           <p className="mt-2 text-sm text-muted">
@@ -65,6 +72,7 @@ export default async function EditPage({ searchParams }: PageProps<"/me/edit">) 
           </Link>
         </div>
       </div>
+      {kind === "all_time" && <PlaylistPanel playlistId={profile?.playlistId ?? null} stale={playlistStale} setInStone={!!profile?.setAt} />}
       <EditClient
         kind={kind}
         initial={items}
