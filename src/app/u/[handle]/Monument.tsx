@@ -1,5 +1,6 @@
 "use client";
 
+import { RulesEditor } from "@/components/RulesEditor";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Altitude } from "@/components/World";
@@ -71,8 +72,13 @@ export function Monument({
   toolbar,
   neighbors,
   receipts = null,
+  stone = null,
+  rules = null,
 }: {
   person: { id: string; name: string; handle: string; color: string };
+  /** when the list was set in stone (ISO), if it has been */
+  stone?: string | null;
+  rules?: string | null;
   songs: MonumentSong[];
   receipts?: Receipts | null;
   isMe: boolean;
@@ -189,7 +195,8 @@ export function Monument({
 
   const crown = PIECES.crown;
   const baseP = PIECES[base];
-  const skyPad = mobile ? 180 : 260;
+  // room above the column for the label, seal, rules and toolbar
+  const skyPad = (mobile ? 180 : 260) + (stone ? 40 : 0) + (rules || isMe ? (mobile ? 90 : 70) : 0);
   const m = PX_PER_M * s; // CSS pixels per meter
   // the name stands just behind the frame: the frame covers only its feet
   const giantPx = Math.min(viewW * (mobile ? 0.3 : Math.max(0.14, 0.92 / Math.max(3, person.name.length))), 300);
@@ -212,6 +219,14 @@ export function Monument({
           <p className="sticker sticker-blue -rotate-2">
             {isMe ? "My all-timers" : `${person.name}'s all-timers`} · {songs.length} {songs.length === 1 ? "song" : "songs"}
           </p>
+          {stone && (
+            <div>
+              <span className="stone-badge">
+                Set in stone · {new Date(stone).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+              </span>
+            </div>
+          )}
+          {(rules || isMe) && <RulesEditor initial={rules} editable={isMe} />}
           {toolbar && <div className="mt-4 flex flex-wrap justify-center gap-2">{toolbar}</div>}
           {receipts && (receipts.streams != null || receipts.mostPlayed || receipts.topIsMost) && (
             <div className="mon-receipts">

@@ -1084,3 +1084,129 @@ body:has(.monthly) main { max-width: none; padding-left: 0; padding-right: 0; }
 .why-card q { font-family: var(--font-body), serif; font-style: italic; font-size: 17px; line-height: 1.35; quotes: "\201C" "\201D"; }
 .why-moment { font-size: 13px; color: #6b5f4b; }
 .why-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* =============================================================================
+   Set in stone: the one ceremony in the place. The page dims, a marble slab rises,
+   SET IN STONE is cut into it a letter at a time (chips of stone fly off each one),
+   and a gold seal stamps the year. Everything after is quiet.
+   ========================================================================== */
+html.stone-open { overflow: hidden; }
+.stone {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(24, 30, 66, 0.72), rgba(8, 10, 26, 0.92));
+  backdrop-filter: blur(4px) saturate(0.7);
+  animation: stone-fade 0.5s ease-out both;
+}
+@keyframes stone-fade { from { opacity: 0; } }
+.stone-ask {
+  max-width: 460px; padding: 30px 30px 24px; border-radius: 14px; text-align: center; color: #2f281e;
+  background: radial-gradient(140% 90% at 50% 0%, #fffdf7, #efe6d2);
+  box-shadow: 0 0 0 2px #fff, 0 40px 80px -30px rgba(0, 0, 0, 0.8);
+}
+.stone-ask h2 { font-family: var(--font-garamond), serif; font-size: 32px; font-weight: 600; line-height: 1.05; }
+.stone-ask p { margin-top: 12px; line-height: 1.45; }
+.stone-fine { font-size: 14px; color: #6b5f4b; }
+.stone-error { color: #a2432f; font-size: 14px; }
+.stone-actions { margin-top: 18px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
+
+.stone-stage { display: grid; justify-items: center; gap: 22px; width: min(560px, 100%); }
+.stone-slab {
+  position: relative; width: 100%; padding: 40px 28px 46px; text-align: center;
+  border-radius: 10px 10px 4px 4px;
+  background:
+    radial-gradient(120% 70% at 30% 10%, rgba(255, 255, 255, 0.9), transparent 60%),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgba(150, 140, 125, 0.08) 46px 48px, transparent 48px 90px),
+    linear-gradient(170deg, #f8f4ec, #e3dccd 70%, #d4ccba);
+  box-shadow: inset 0 2px 0 #fff, inset 0 -8px 18px rgba(90, 80, 60, 0.18), 0 50px 90px -30px rgba(0, 0, 0, 0.9);
+  animation: slab-rise 0.9s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes slab-rise { from { opacity: 0; transform: translateY(80px) scale(0.94); } }
+.stone-cover {
+  width: 104px; height: 104px; margin: 0 auto; object-fit: cover; border-radius: 2px;
+  box-shadow: 0 0 0 5px #efe4c8, 0 0 0 7px #b8913f, 0 16px 24px -12px rgba(30, 20, 0, 0.7);
+  animation: stone-fade 0.6s 0.4s ease-out both;
+}
+.stone-words {
+  margin-top: 24px; font-family: var(--font-roman), serif; font-weight: 700;
+  font-size: clamp(30px, 8.4vw, 54px); letter-spacing: 0.12em; line-height: 1; white-space: nowrap;
+}
+.stone-letter {
+  position: relative; display: inline-block;
+  color: #8d8576;
+  /* cut into the stone: shadow above, light catching the lower lip */
+  text-shadow: 0 -1px 0 rgba(60, 50, 35, 0.55), 0 1.5px 0 rgba(255, 255, 255, 0.95);
+  opacity: 0;
+  animation: carve 0.28s calc(1s + var(--i) * 0.16s) steps(1) forwards, chisel 0.22s calc(1s + var(--i) * 0.16s) ease-out;
+}
+@keyframes carve { to { opacity: 1; } }
+@keyframes chisel { 0% { transform: translate(1px, -1px); } 50% { transform: translate(-1px, 1px); } 100% { transform: none; } }
+.stone-chips { position: absolute; left: 50%; top: 40%; pointer-events: none; }
+.stone-chips i {
+  position: absolute; width: 4px; height: 4px; border-radius: 1px; background: #cfc6b4; opacity: 0;
+  animation: chip 0.6s calc(1s + var(--i) * 0.16s) ease-out forwards;
+  --dx: calc((var(--k) - 1.5) * 14px);
+}
+@keyframes chip {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(18px + var(--k) * 7px)) rotate(200deg); }
+}
+.stone-meta {
+  margin-top: 16px; font-family: var(--font-garamond), serif; font-style: italic; font-size: 20px; color: #6b5f4b;
+  opacity: 0; animation: stone-fade-in 0.6s 3s ease-out forwards;
+}
+@keyframes stone-fade-in { to { opacity: 1; } }
+.stone-seal {
+  position: absolute; right: -18px; bottom: -26px; width: 104px; height: 104px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #fbe7a6, #d9ad4c 40%, #a57a2a 75%, #7c5a1c);
+  box-shadow: 0 3px 0 #5e4416, 0 18px 30px -10px rgba(0, 0, 0, 0.7), inset 0 0 0 5px rgba(255, 240, 200, 0.25);
+  opacity: 0; transform: scale(2.6) rotate(-30deg);
+  animation: seal-down 0.42s 2.55s cubic-bezier(.3, 1.6, .5, 1) forwards;
+}
+@keyframes seal-down { to { opacity: 1; transform: scale(1) rotate(-12deg); } }
+.stone-seal svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stone-seal text { font-family: var(--font-roman), serif; font-size: 8.4px; font-weight: 700; letter-spacing: 1.2px; fill: #5e4416; }
+.stone-seal b { font-family: var(--font-roman), serif; font-size: 22px; color: #4c3810; text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6); }
+.stone-after {
+  width: 100%; display: grid; justify-items: center; gap: 12px; text-align: center; color: #f3ead7;
+  animation: stone-fade 0.5s ease-out both;
+}
+.stone-after .btn-link { color: #e7d8b6; }
+.stone-done .stone-letter, .stone-done .stone-meta, .stone-done .stone-seal, .stone-done .stone-cover { animation: none; opacity: 1; }
+.stone-done .stone-seal { transform: scale(1) rotate(-12deg); }
+@media (prefers-reduced-motion: reduce) {
+  .stone, .stone-slab, .stone-letter, .stone-chips i, .stone-meta, .stone-seal, .stone-cover { animation: none !important; opacity: 1; }
+  .stone-chips { display: none; }
+  .stone-seal { transform: scale(1) rotate(-12deg); }
+}
+
+/* the seal that stays on a column once its list is set */
+.stone-badge {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 5px 14px 5px 6px; border-radius: 999px;
+  font-family: var(--font-roman), serif; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; color: #4c3810;
+  background: linear-gradient(110deg, #e6c069, #f9e5a4 45%, #d5a84b);
+  box-shadow: inset 0 1px 0 #fff6d8, 0 3px 0 #7d5d22, 0 12px 20px -12px rgba(0, 0, 0, 0.5);
+}
+.stone-badge::before {
+  content: ""; width: 20px; height: 20px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c8, #b98b30 70%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.mon-rules {
+  max-width: 34rem; margin: 12px auto 0; padding: 0 16px;
+  font-family: var(--font-body), serif; font-style: italic; font-size: 18px; line-height: 1.35; color: #fff;
+  text-shadow: 0 1px 10px rgba(10, 20, 80, 0.55);
+}
+.mon-rules q { quotes: "\201C" "\201D"; }
+.rules-edit {
+  display: block; margin: 6px auto 0; font-family: var(--font-body), serif; font-style: normal; font-size: 14px;
+  color: #fff; text-decoration: underline; text-underline-offset: 3px; opacity: 0.85;
+}
+.rules-edit:hover { opacity: 1; }
+.rules-form {
+  display: grid; gap: 8px; max-width: 30rem; margin: 12px auto 0; padding: 14px; border-radius: 10px; text-align: left;
+  background: rgba(255, 253, 247, 0.96); box-shadow: 0 20px 40px -20px rgba(10, 20, 80, 0.7);
+}
+.rules-form label { font-size: 14px; color: #5b4f3c; }
