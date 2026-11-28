@@ -3,12 +3,13 @@ import { and, count, eq, isNotNull, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { User } from "@/db/schema";
 import { getAccount } from "./listening";
+import { getProfile } from "./profile";
 import { inGroup } from "./groups";
 
 /** Where this person is with setup, for the guide's checklist. Cheap counts only. */
 export async function guideStatus(user: User) {
   const db = await getDb();
-  const [sessions, allTime, onDeck, stories, acct, crew, friends] = await Promise.all([
+  const [sessions, allTime, onDeck, stories, acct, crew, friends, profile] = await Promise.all([
     db.select({ n: count() }).from(schema.sessions).where(eq(schema.sessions.userId, user.id)),
     db.select({ n: count() }).from(schema.listEntries).where(and(eq(schema.listEntries.userId, user.id), eq(schema.listEntries.kind, "all_time"))),
     db.select({ n: count() }).from(schema.listEntries).where(and(eq(schema.listEntries.userId, user.id), eq(schema.listEntries.kind, "on_deck"))),
@@ -19,6 +20,7 @@ export async function guideStatus(user: User) {
     getAccount(user.id),
     db.select().from(schema.crews).where(eq(schema.crews.id, user.crewId)),
     db.select({ n: count() }).from(schema.users).where(inGroup(user.crewId)),
+    getProfile(user.id),
   ]);
   return {
     name: user.name,
@@ -31,6 +33,7 @@ export async function guideStatus(user: User) {
     onDeck: onDeck[0].n,
     stories: stories[0].n,
     statsfm: !!acct && acct.status !== "gone",
+    setInStone: !!profile?.setAt,
   };
 }
 export type GuideStatus = Awaited<ReturnType<typeof guideStatus>>;

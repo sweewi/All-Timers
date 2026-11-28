@@ -321,11 +321,11 @@ const STEPS: Step[] = [
           <span style={{ height: 88 }} />
         </div>
         <p>
-          {s ? `${s.name}, this` : "This"} is where {s?.crewName ?? "your crew"} keeps everyone&apos;s favorite songs of all time, ranked. Each
-          person&apos;s list stands as a marble column on the plaza: their #1 at the top, in the stars.
+          {s ? `${s.name}, this` : "This"} is where {s?.crewName ?? "the group"} keeps everyone&apos;s favorite songs of all time, in order.
+          Each person&apos;s list stands as a marble column on the plaza: their #1 at the top, in the stars.
         </p>
         <p>
-          The point isn&apos;t the list, it&apos;s the arguments: <i>that&apos;s</i> your #1? How is this not on yours? Who put you on to that?
+          A list says who someone is. The good part is the why: what earns a spot, the memory behind a song, who put you on to it.
         </p>
         <Tip>First a minute of setup, then a quick tour. You can reopen this any time with the ? at the top.</Tip>
       </>
@@ -468,6 +468,37 @@ const STEPS: Step[] = [
         </p>
         <Go href="/me/stories" label="Open the why room" close={close} />
         <Tip>One line is plenty. Start with your top three.</Tip>
+      </>
+    ),
+  },
+  {
+    chapter: "How it works",
+    title: "Set it in stone",
+    done: (s) => s.setInStone,
+    render: ({ s, close }) => (
+      <>
+        <div className="guide-art">
+          <span className="stone-badge">Set in stone · {new Date().getFullYear()}</span>
+        </div>
+        <p>
+          Give the list a week or two to settle. When it&apos;s right, <b>set it in stone</b> from My column. It&apos;s a label, not a lock: a
+          song can still earn its way on later, and when one does, the group hears about it.
+        </p>
+        <p>Add your rules while you&apos;re there: what does a song need to make your list?</p>
+        {s && <Go href={`/u/${s.handle}`} label="Go to my column" close={close} />}
+      </>
+    ),
+  },
+  {
+    chapter: "How it works",
+    title: "Show it off",
+    render: ({ close }) => (
+      <>
+        <p>
+          <b>My card</b> turns the list into one image for a story or the group chat: pick a look and a layout. There&apos;s also a link
+          anyone can open, so friends who aren&apos;t here yet can see the list (and make their own).
+        </p>
+        <Go href="/me/share" label="Make my card" close={close} />
       </>
     ),
   },
