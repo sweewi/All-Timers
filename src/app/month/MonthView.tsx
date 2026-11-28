@@ -78,7 +78,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
     name: carvedTitle(p.track.name),
     artists: artistLine(p.track.artists),
     imageUrl: p.track.imageUrl,
-    nominatedBy: p.nominatedBy ? (p.nominatedBy === viewer.id ? "you" : (who.get(p.nominatedBy)?.name ?? "someone")) : null,
+    nominatedBy: p.nominatedBy ? (who.get(p.nominatedBy)?.name ?? "someone") : null,
     mine: p.nominatedBy === viewer.id,
     kept: p.source === "plays" && p.detail.length === 0,
     from: p.detail
@@ -87,7 +87,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
         const u = who.get(d.userId)!;
         // play counts follow each person's "show my play counts" switch; the rank always shows
         const showCount = u.id === viewer.id || visibility(accts.get(u.id)).plays;
-        return { name: u.id === viewer.id ? "You" : u.name, color: u.color, rank: d.rank, streams: showCount ? d.streams : null };
+        return { name: u.name, color: u.color, rank: d.rank, streams: showCount ? d.streams : null };
       }),
   }));
   const myNominations = pool.filter((p) => p.nominatedBy === viewer.id).length;
@@ -98,7 +98,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
       const acct = accts.get(m.id);
       return acct && visibility(acct).tops && !contributed.has(m.id);
     })
-    .map((m) => (m.id === viewer.id ? "you" : m.name));
+    .map((m) => m.name);
 
   return (
     <div className="monthly">
@@ -121,7 +121,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
               title={voters.has(m.id) ? "voted" : "hasn't voted yet"}
             >
               {voters.has(m.id) && "✓ "}
-              {m.id === viewer.id ? "You" : m.name}
+              {m.name}
             </span>
           ))}
         </div>
@@ -129,7 +129,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
       </header>
 
       {phase === "revealed" ? (
-        <Results roundId={round.id} who={who} viewerId={viewer.id} />
+        <Results roundId={round.id} who={who} />
       ) : (
         <section className="monthly-body">
           {cards.length === 0 ? (
@@ -186,7 +186,7 @@ export async function MonthView({ viewer, month }: { viewer: User; month: string
   );
 }
 
-async function Results({ roundId, who, viewerId }: { roundId: string; who: Map<string, User>; viewerId: string }) {
+async function Results({ roundId, who }: { roundId: string; who: Map<string, User> }) {
   const [results, firsts] = await Promise.all([getResults(roundId), firstPicks(roundId)]);
   const voted = results.some((r) => r.voters > 0);
   if (!results.length) {
@@ -201,7 +201,7 @@ async function Results({ roundId, who, viewerId }: { roundId: string; who: Map<s
   const firstBy = new Map<string, string[]>();
   for (const f of firsts) {
     const u = who.get(f.userId);
-    if (u) firstBy.set(f.trackId, [...(firstBy.get(f.trackId) ?? []), u.id === viewerId ? "You" : u.name]);
+    if (u) firstBy.set(f.trackId, [...(firstBy.get(f.trackId) ?? []), u.name]);
   }
   return (
     <section className="monthly-body">

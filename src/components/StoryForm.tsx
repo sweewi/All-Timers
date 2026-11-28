@@ -168,7 +168,7 @@ export function StoryForm({
           <div className="mt-3 flex flex-wrap gap-2">
             <CopyButton text={`/join/${inviteCode}?from=${invite.originId}`} label="Copy their invite link" />
             {onSaved && (
-              <button type="button" onClick={() => onSaved(v)} className="rounded-full bg-accent px-4 py-1.5 font-medium text-black">
+              <button type="button" onClick={() => onSaved(v)} className="btn btn-gold btn-sm">
                 Continue
               </button>
             )}
@@ -180,7 +180,7 @@ export function StoryForm({
             type="button"
             onClick={submit}
             disabled={pending}
-            className="rounded-full bg-accent px-5 py-2 font-medium text-black disabled:opacity-50"
+            className="btn btn-gold"
           >
             {pending ? "Saving…" : saveLabel}
           </button>

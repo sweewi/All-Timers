@@ -101,7 +101,7 @@ export function Promenade({
             const inner = (
               <>
                 {now && (
-                  <span className="mini-live" title={`${m!.isMe ? "You're" : `${m!.name} is`} playing ${now.track.name}`}>
+                  <span className="mini-live" title={`${m!.name} is playing ${now.track.name}`}>
                     {now.track.imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={now.track.imageUrl} alt="" />
@@ -129,12 +129,12 @@ export function Promenade({
                 <span className="mini-label" style={{ top: `${((mini.ground / mini.h) * 100).toFixed(2)}%` }}>
                   {m ? (
                     <>
-                      <b style={{ ["--c" as string]: m.color }}>{m.isMe ? "You" : m.name}</b>
+                      <b style={{ ["--c" as string]: m.color }}>{m.name}</b>
                       <small>{m.count ? `${m.count} songs · climb it` : "no list yet"}</small>
                     </>
                   ) : (
                     <>
-                      <b>Your friend</b>
+                      <b>A friend</b>
                       <small>invite them</small>
                     </>
                   )}

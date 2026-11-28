@@ -27,11 +27,11 @@ export function NominateForm({ month }: { month: string }) {
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
-        className="min-w-0 flex-1 rounded-full border border-[#d9cfbd] bg-white/70 px-4 py-2 text-sm outline-none focus:border-[#b08a3e]"
+        className="field"
       />
       <button
         type="button"
-        className="rounded-full border border-[#d9cfbd] px-4 py-2 text-sm hover:border-[#b08a3e]"
+        className="btn btn-marble btn-sm"
         onClick={async () => {
           try {
             const t = await navigator.clipboard?.readText();

@@ -81,7 +81,7 @@ export default async function JoinPage({
         <form action={joinCrew} className="mt-8 space-y-3">
           <input type="hidden" name="code" value={code} />
           <input type="hidden" name="fromOrigin" value={fromOrigin} />
-          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">
+          <button className="btn btn-gold">
             Join as {user.name}
           </button>
           <p className="text-xs text-muted">
@@ -102,7 +102,7 @@ export default async function JoinPage({
               className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2"
             />
           </label>
-          <button className="rounded-full bg-accent px-5 py-2 font-medium text-black">
+          <button className="btn btn-gold">
             Join
           </button>
           <p className="text-xs text-muted">

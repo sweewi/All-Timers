@@ -163,6 +163,13 @@ export async function toggleReaction(target: string, kind: string) {
   await budget("write", user.id);
   if (!/^(song|moves):[\w:-]{1,160}$/.test(target) || !(REACTIONS as readonly string[]).includes(kind)) return { ok: false as const };
   const db = await getDb();
+  // only on things that belong to someone else in one of this person's groups
+  const [type, a] = target.split(":");
+  const ownerId =
+    type === "moves"
+      ? (await db.select({ u: schema.rankEvents.userId }).from(schema.rankEvents).where(eq(schema.rankEvents.batchId, a)).limit(1))[0]?.u
+      : a;
+  if (!ownerId || ownerId === user.id || !(await shareAGroup(user.id, ownerId))) return { ok: false as const };
   const mine = and(
     eq(schema.reactions.userId, user.id),
     eq(schema.reactions.target, target),

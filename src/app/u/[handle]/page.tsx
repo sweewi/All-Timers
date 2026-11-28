@@ -66,7 +66,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
     const neighbors = [...order.slice(at + 1), ...order.slice(0, Math.max(0, at))]
       .filter((o) => o.member.id !== person.id)
       .map((o) => ({
-        name: o.member.id === viewer.id ? "You" : o.member.name,
+        name: o.member.name,
         handle: o.member.handle,
         color: o.member.color,
         count: o.count,
@@ -87,7 +87,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
       memory: [e.origin?.story, e.origin?.whenText].filter(Boolean).join(" · ") || null,
       echoes: echoes(e.track)
         .filter((h) => h.user.id !== person.id)
-        .map((h) => ({ name: h.user.id === viewer.id ? "You" : h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
+        .map((h) => ({ name: h.user.name, handle: h.user.handle, color: h.user.color, rank: h.rank })),
       from: e.origin?.fromUser ? { name: e.origin.fromUser.name, handle: e.origin.fromUser.handle, color: e.origin.fromUser.color } : null,
       steal: !isMe && !social.has(e.track),
       reactions: reacts[songTarget(person.id, e.track.id)] ?? {},
@@ -157,20 +157,20 @@ export default async function ProfilePage({ params, searchParams }: PageProps<"/
         <div className="flex flex-wrap gap-2">
           {isMe ? (
             <>
-              <Link href={`/me/edit?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
+              <Link href={`/me/edit?list=${kind}`} className="btn btn-marble btn-sm">
                 Reorder
               </Link>
-              <Link href={`/me/import?list=${kind}`} className="rounded-full border border-line px-4 py-2 text-sm">
+              <Link href={`/me/import?list=${kind}`} className="btn btn-marble btn-sm">
                 Import from Spotify
               </Link>
             </>
           ) : (
-            <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className="rounded-full border border-line px-4 py-2 text-sm">
+            <Link href={`/compare?a=${viewer.handle}&b=${person.handle}`} className="btn btn-marble btn-sm">
               Compare with me
             </Link>
           )}
           {allTime.length > 0 && (
-            <Link href={`/u/${handle}`} className="rounded-full border border-line px-4 py-2 text-sm">
+            <Link href={`/u/${handle}`} className="btn btn-marble btn-sm">
               Monument view
             </Link>
           )}

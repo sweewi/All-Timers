@@ -29,7 +29,7 @@ type Status = {
 };
 
 type Step = {
-  chapter: "Get set up" | "How it works" | "You're in";
+  chapter: "Get set up" | "How it works" | "Welcome in";
   title: string;
   done?: (s: Status) => boolean;
   render: (ctx: { s: Status | null; close: () => void; reload: () => void; path: string }) => React.ReactNode;
@@ -535,7 +535,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    chapter: "You're in",
+    chapter: "Welcome in",
     title: "Bring people in",
     render: ({ s }) => (
       <>

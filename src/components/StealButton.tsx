@@ -8,7 +8,7 @@ export function StealButton({ trackId, fromUserId, label = "Steal it" }: { track
   const [state, setState] = useState<"idle" | "done" | "had">("idle");
   const [pending, start] = useTransition();
   if (state !== "idle")
-    return <span className="sticker sticker-done">{state === "done" ? "In your On Deck ✓" : "Already yours"}</span>;
+    return <span className="sticker sticker-done">{state === "done" ? "On Deck ✓" : "Already yours"}</span>;
   return (
     <button
       type="button"

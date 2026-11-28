@@ -19,7 +19,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
       <Altitude base={0.58} range={0.15} />
       <h1 className="rank-num text-5xl">Compare</h1>
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">{a.id === viewer.id ? "You" : a.name} vs</span>
+        <span className="text-muted">{a.name} vs</span>
         {members
           .filter((m) => m.id !== a.id)
           .map((m) => (
@@ -169,7 +169,7 @@ async function Comparison({ a, b }: { a: User; b: User }) {
         ) : (
           <ul className="mt-4 flex flex-wrap gap-2">
             {sharedArtists.map((s) => (
-              <li key={s.name} className="rounded-full border border-line px-3 py-1 text-sm">
+              <li key={s.name} className="btn btn-marble btn-sm">
                 {s.name}{" "}
                 <span className="text-muted">
                   {s.a}·{s.b}

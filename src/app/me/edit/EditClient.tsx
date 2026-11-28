@@ -124,7 +124,7 @@ export function EditClient({
           type="button"
           onClick={save}
           disabled={!dirty || pending}
-          className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-black disabled:opacity-40"
+          className="btn btn-gold"
         >
           {pending ? "Saving…" : "Save order"}
         </button>
